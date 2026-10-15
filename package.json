@@ -1,0 +1,39 @@
+{
+  "name": "claude-deck",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Toutes tes sessions Claude Code au même endroit : statut en couleur, terminaux intégrés, recherche et reprise en un clic (macOS)",
+  "author": "bartolije",
+  "license": "MIT",
+  "homepage": "https://github.com/bartolije/claude-deck",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bartolije/claude-deck.git"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper",
+    "icons": "electron scripts/make-icons.js && bash scripts/make-icns.sh",
+    "package": "bash scripts/package.sh",
+    "install-app": "npm run package && mkdir -p ~/Applications && rm -rf ~/Applications/'Claude Deck.app' && cp -R 'dist/Claude Deck-darwin-arm64/Claude Deck.app' ~/Applications/",
+    "release": "bash scripts/release.sh",
+    "release:dry": "bash scripts/release.sh --dry-run"
+  },
+  "devDependencies": {
+    "@electron/fuses": "^2.1.3",
+    "@electron/packager": "^20.3.0",
+    "electron": "^44.7.2"
+  },
+  "dependencies": {
+    "@xterm/addon-clipboard": "^0.2.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-unicode11": "^0.9.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
+    "node-pty": "^1.1.0"
+  },
+  "allowScripts": {
+    "electron@44.7.2": true
+  }
+}

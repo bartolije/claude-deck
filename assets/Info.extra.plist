@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>Claude Deck sélectionne l’onglet Terminal ou iTerm2 dans lequel tourne une session Claude.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Le mode vocal de Claude Code utilise le micro dans les terminaux de Claude Deck.</string>
+</dict>
+</plist>

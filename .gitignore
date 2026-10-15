@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.DS_Store
+# Clés de signature : seule la clé publique est versionnée.
+*.pem
+!assets/update-public-key.pem

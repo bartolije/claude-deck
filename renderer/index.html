@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:"
+    />
+    <title>Claude Deck</title>
+    <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <aside id="sidebar">
+      <div class="side-top">
+        <div class="titlebar-space"></div>
+        <div id="summary" class="summary"></div>
+      </div>
+      <div class="new-row">
+        <button id="btn-new" class="btn primary" title="Lance la commande de nouvelle session dans un terminal intégré (⌘T)">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+          Nouvelle session
+          <kbd>⌘T</kbd>
+        </button>
+        <button id="btn-new-folder" class="btn icon" title="Nouvelle session dans un autre dossier… (⇧⌘T)">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4.5h4l1.5 1.5H14v6.5H2z" /></svg>
+        </button>
+      </div>
+      <label class="search-row">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>
+        <input id="search" type="search" placeholder="Rechercher une conversation" spellcheck="false" autocomplete="off" />
+        <kbd>⌘F</kbd>
+      </label>
+      <div id="update" class="restore update" hidden></div>
+      <div id="restore" class="restore" hidden></div>
+      <nav id="list" class="list" aria-label="Sessions"></nav>
+      <footer class="legend">
+        <span><i class="dot s-waiting"></i>attend</span>
+        <span><i class="dot s-done"></i>terminée</span>
+        <span><i class="dot s-busy"></i>en cours</span>
+        <span><i class="dot s-idle"></i>au repos</span>
+      </footer>
+    </aside>
+
+    <main id="pane">
+      <div class="drag-strip"></div>
+      <header id="pane-head" class="pane-head" hidden></header>
+      <section id="term-host" class="term-host" hidden></section>
+      <section id="card" class="card-wrap" hidden></section>
+      <section id="empty" class="empty"></section>
+    </main>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+    <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+    <script src="../node_modules/@xterm/addon-unicode11/lib/addon-unicode11.js"></script>
+    <script src="../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
+    <script src="../node_modules/@xterm/addon-clipboard/lib/addon-clipboard.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
