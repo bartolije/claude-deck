@@ -1,6 +1,6 @@
 {
   "name": "claude-deck",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Toutes tes sessions Claude Code au même endroit : statut en couleur, terminaux intégrés, recherche et reprise en un clic (macOS)",
   "author": "bartolije",
@@ -16,7 +16,7 @@
     "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper",
     "icons": "electron scripts/make-icons.js && bash scripts/make-icns.sh",
     "package": "bash scripts/package.sh",
-    "install-app": "npm run package && mkdir -p ~/Applications && rm -rf ~/Applications/'Claude Deck.app' && cp -R 'dist/Claude Deck-darwin-arm64/Claude Deck.app' ~/Applications/",
+    "install-app": "npm run package && mkdir -p ~/Applications && rm -rf ~/Applications/'Claude Deck.app' && cp -R 'dist/build.noindex/Claude Deck-darwin-arm64/Claude Deck.app' ~/Applications/",
     "release": "bash scripts/release.sh",
     "release:dry": "bash scripts/release.sh --dry-run"
   },

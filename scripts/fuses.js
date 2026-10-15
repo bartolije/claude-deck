@@ -18,7 +18,8 @@ flipFuses(path.join(appPath, 'Contents', 'MacOS', 'Claude Deck'), {
   [FuseV1Options.RunAsNode]: false,
   [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
   [FuseV1Options.EnableNodeCliInspectArguments]: false,
-  [FuseV1Options.EnableCookieEncryption]: true,
+  // EnableCookieEncryption reste désactivé : l'appli n'a aucun cookie, et avec une signature ad hoc la clé
+  // rangée dans le trousseau déclencherait une demande d'accès après chaque mise à jour.
   [FuseV1Options.OnlyLoadAppFromAsar]: true,
 })
   .then(() => console.log('Fusibles appliqués'))

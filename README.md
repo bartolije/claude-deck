@@ -112,7 +112,7 @@ envoie la conversation dans l'historique du terminal, avec une barre de défilem
 ```bash
 npm install          # npm 11 : le script d'Electron est autorisé dans allowScripts
 npm start            # lance l'appli depuis les sources
-npm run package      # dist/Claude Deck-darwin-arm64/Claude Deck.app
+npm run package      # dist/build.noindex/Claude Deck-darwin-arm64/Claude Deck.app
 npm run install-app  # package + copie dans ~/Applications
 ```
 

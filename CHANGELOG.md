@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Plus de demande d'accès au trousseau au lancement : l'option de chiffrement des cookies est retirée (l'appli n'en utilise aucun, et la demande serait revenue après chaque mise à jour).
+- La copie de travail produite par `npm run package` n'apparaît plus dans Spotlight ni le Launchpad, pour ne pas lancer la mauvaise copie.
+
 ## 0.1.0
 
 Première version publique.

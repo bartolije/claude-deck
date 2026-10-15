@@ -11,7 +11,7 @@ VERSION=$(node -p "require('./package.json').version")
 TAG="v$VERSION"
 OUT="dist/release"
 NAME="Claude-Deck-$VERSION-arm64"
-APP="dist/Claude Deck-darwin-arm64/Claude Deck.app"
+APP="dist/build.noindex/Claude Deck-darwin-arm64/Claude Deck.app"
 
 if [ $DRY = 0 ]; then
   [ -z "$(git status --porcelain)" ] || { echo "Des modifications ne sont pas committées."; exit 1; }
