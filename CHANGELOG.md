@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Réglages dans l'appli (⌘,), enregistrés aussitôt : démarrage avec la session, compteur de la barre des menus, badge du Dock, notifications avec ou sans son, mises à jour, commandes de session, police et affichage du terminal.
+- Raccourcis modifiables (clic puis la combinaison, doublons signalés) et raccourci global pour afficher Claude Deck depuis n'importe quelle appli.
+- Onglet Autorisations : état des accès macOS (dossiers protégés, accès complet au disque, micro, contrôle de Terminal, notifications), demandes en un clic et ouverture de la bonne page des Réglages système.
+
 ## 0.2.0
 
 - Jauge de contexte sur chaque session : part de la fenêtre utilisée (orange dès 70 %, rouge dès 90 %), dans la liste et l'en-tête.

@@ -38,6 +38,10 @@ const S = {
   bridgeDismissed: false,
   stats: null,
   statsAt: 0,
+  settings: null,
+  settingsTab: 'general',
+  perms: null,
+  recording: null, // raccourci en cours d'enregistrement
 };
 
 // --- Libellés -------------------------------------------------------------------------
@@ -265,6 +269,7 @@ function navOrder(groups = grouped()) {
 function itemByKey(key) {
   if (!key) return null;
   if (key === 'view:stats') return { key, kind: 'view', title: 'Statistiques et usage' };
+  if (key === 'view:settings') return { key, kind: 'view', title: 'Réglages' };
   const it = S.items.find((i) => i.key === key) || (S.results && S.results.find((i) => i.key === key));
   if (it) return it;
   if (S.snapshot && S.snapshot.key === key) return S.snapshot;
@@ -549,6 +554,16 @@ async function ensurePreview(it) {
   if (S.selectedSessionId === it.sessionId) renderPane(true);
 }
 
+const kbd = (name) => prettyAccelerator((S.config.shortcuts || {})[name] || '');
+
+// Libellés de raccourcis visibles en permanence : ils suivent les Réglages.
+function updateShortcutHints() {
+  const newKbd = document.querySelector('#btn-new kbd');
+  if (newKbd) newKbd.textContent = kbd('newSession');
+  const searchKbd = document.querySelector('.search-row kbd');
+  if (searchKbd) searchKbd.textContent = kbd('search');
+}
+
 function emptyHtml() {
   return `<div class="empty-inner">
     <h2>Toutes tes sessions Claude Code au même endroit</h2>
@@ -558,14 +573,14 @@ function emptyHtml() {
       ${btn('newFolder', 'folder', 'Dans un autre dossier…')}
     </div>
     <div class="shortcuts">
-      <kbd>⌘T</kbd><span>Nouvelle session</span>
-      <kbd>⌘F</kbd><span>Rechercher dans toutes les conversations</span>
+      <kbd>${esc(kbd('newSession'))}</kbd><span>Nouvelle session</span>
+      <kbd>${esc(kbd('search'))}</kbd><span>Rechercher dans toutes les conversations</span>
       <kbd>↩</kbd><span>Reprendre la conversation sélectionnée</span>
-      <kbd>⌃⌘A</kbd><span>Archiver la conversation sélectionnée</span>
-      <kbd>⌘J</kbd><span>Prochaine session qui t’attend</span>
+      <kbd>${esc(kbd('archive'))}</kbd><span>Archiver la conversation sélectionnée</span>
+      <kbd>${esc(kbd('nextAttention'))}</kbd><span>Prochaine session qui t’attend</span>
       <kbd>⌘1 … ⌘9</kbd><span>Aller à une session (maintiens ⌘ pour voir les numéros)</span>
-      <kbd>⇧⌘] ⇧⌘[</kbd><span>Session suivante / précédente</span>
-      <kbd>⌘W</kbd><span>Fermer la session</span>
+      <kbd>${esc(kbd('nextSession'))} ${esc(kbd('prevSession'))}</kbd><span>Session suivante / précédente</span>
+      <kbd>${esc(kbd('closeSession'))}</kbd><span>Fermer la session</span>
       <kbd>⇧↩ ou ⌥↩</kbd><span>Retour à la ligne dans le prompt</span>
     </div>
   </div>`;
@@ -586,6 +601,27 @@ function renderPane(force = false) {
   }
   emptyEl.hidden = true;
   headEl.hidden = false;
+  if (it.key === 'view:settings') {
+    termHost.hidden = true;
+    cardEl.hidden = false;
+    S.visiblePty = null;
+    if (force || S.headSig !== 'view:settings') {
+      headEl.innerHTML = `<span class="pill"><i class="dot s-idle"></i>Réglages</span>
+        <div class="title"><h1>Réglages</h1><span class="meta">enregistrés aussitôt</span></div>
+        <div class="actions"></div>`;
+    }
+    S.headSig = 'view:settings';
+    if (!S.settings) loadSettings();
+    if (S.settingsTab === 'perms' && !S.perms) loadPerms();
+    const bodySig = `settings:${S.settingsTab}:${S.recording}:${JSON.stringify(S.settings)}:${JSON.stringify(S.perms)}`;
+    if (force || bodySig !== S.bodySig) {
+      const top = cardEl.scrollTop;
+      cardEl.innerHTML = settingsHtml(S.settings, S.settingsTab, S.perms, S.recording);
+      cardEl.scrollTop = S.bodySig.startsWith(`settings:${S.settingsTab}:`) ? top : 0;
+    }
+    S.bodySig = bodySig;
+    return;
+  }
   if (it.kind === 'view') {
     termHost.hidden = true;
     cardEl.hidden = false;
@@ -635,6 +671,7 @@ function renderPane(force = false) {
 // --- Sélection et actions -----------------------------------------------------------------------
 
 function select(key, { focus = true } = {}) {
+  if (key !== 'view:settings' && S.recording) stopRecording();
   S.selected = key;
   const it = itemByKey(key);
   S.selectedSessionId = it ? it.sessionId || null : null;
@@ -726,6 +763,24 @@ async function runAction(act, it) {
       return render();
     case 'refreshStats':
       return loadStats();
+    case 'checkUpdate':
+      await deck.checkUpdate();
+      return loadSettings();
+    case 'openConfigFile':
+      return deck.openConfigFile();
+    case 'openDataDir':
+      return deck.openDataDir();
+    case 'perm:refresh':
+      return loadPerms();
+    case 'perm:folders':
+    case 'perm:microphone':
+    case 'perm:relaunch':
+    case 'perm:fullDisk':
+    case 'perm:files':
+    case 'perm:automation':
+    case 'perm:notifications':
+      S.perms = await deck.permAction(act.slice(5));
+      return renderPane();
     case 'dismissUpdate':
       S.updateDismissed = S.update && S.update.latest;
       toast('La mise à jour s’installera à la prochaine fermeture de l’appli');
@@ -792,6 +847,46 @@ function primaryAction(it) {
   else if (it.kind === 'closed') runAction('resume', it);
   else if (it.kind === 'background') runAction('attach', it);
   else if (it.host === 'external') runAction('focus', it);
+}
+
+async function loadPerms() {
+  S.perms = await deck.perms();
+  if (S.selected === 'view:settings') renderPane();
+}
+
+async function loadSettings() {
+  S.settings = await deck.settings();
+  if (S.selected === 'view:settings') renderPane();
+}
+
+function openSettings(tab = 'general') {
+  S.settingsTab = tab;
+  if (tab === 'perms') S.perms = null;
+  S.settings = null; // relu à l'ouverture (version, mises à jour, barre d'état…)
+  select('view:settings');
+}
+
+async function saveSetting(patch, check) {
+  S.settings = await deck.setSettings(patch);
+  const ok = check ? check(S.settings.config) : true;
+  toast(ok ? 'Réglage enregistré' : 'Valeur refusée : réglage inchangé');
+  renderPane(true);
+}
+
+function stopRecording() {
+  if (!S.recording) return;
+  S.recording = null;
+  deck.recordingShortcut(false);
+  renderPane(true);
+}
+
+async function finishRecording(acc) {
+  const name = S.recording;
+  S.recording = null;
+  deck.recordingShortcut(false);
+  if (name === '__global') await saveSetting({ globalShortcut: acc }, (c) => c.globalShortcut === acc);
+  else await saveSetting({ shortcuts: { [name]: acc } }, (c) => c.shortcuts[name] === acc);
+  if (name === '__global' && acc && S.settings && !S.settings.globalShortcutOk) toast('Combinaison déjà utilisée par une autre appli');
 }
 
 let statsLoading = false;
@@ -1163,6 +1258,79 @@ document.addEventListener('keydown', (e) => {
   primaryAction(itemByKey(S.selected));
 });
 
+// Retour des Réglages système : l'état des autorisations a pu changer.
+window.addEventListener('focus', () => {
+  if (S.selected === 'view:settings' && S.settingsTab === 'perms') loadPerms();
+});
+
+// --- Réglages : onglets, champs, raccourcis ---------------------------------------------------
+
+cardEl.addEventListener('click', async (e) => {
+  if (S.selected !== 'view:settings') return;
+  const tab = e.target.closest('[data-tab]');
+  if (tab) {
+    stopRecording();
+    S.settingsTab = tab.dataset.tab;
+    if (S.settingsTab === 'perms') loadPerms();
+    renderPane(true);
+    return;
+  }
+  const shortcut = e.target.closest('[data-shortcut]');
+  if (shortcut) {
+    S.recording = S.recording === shortcut.dataset.shortcut ? null : shortcut.dataset.shortcut;
+    deck.recordingShortcut(!!S.recording);
+    renderPane(true);
+    return;
+  }
+  const reset = e.target.closest('[data-reset-shortcut]');
+  if (reset) {
+    const name = reset.dataset.resetShortcut;
+    await saveSetting({ shortcuts: { [name]: S.settings.defaults.shortcuts[name] } });
+    return;
+  }
+  if (e.target.closest('[data-clear-global]')) await saveSetting({ globalShortcut: '' });
+});
+
+cardEl.addEventListener('change', async (e) => {
+  if (S.selected !== 'view:settings') return;
+  const el = e.target;
+  if (el.dataset.special === 'loginItem') {
+    S.settings = await deck.setLoginItem(el.checked);
+    toast(el.checked ? 'Claude Deck s’ouvrira avec ta session' : 'Ouverture automatique désactivée');
+    renderPane(true);
+    return;
+  }
+  if (el.dataset.special === 'bridge') {
+    S.bridge = await deck.setBridge(el.checked); // fenêtre de confirmation côté système
+    await loadSettings();
+    render();
+    return;
+  }
+  const key = el.dataset.key;
+  if (!key) return;
+  let value = el.value;
+  if (el.type === 'checkbox') value = el.checked;
+  else if (el.type === 'number' || key === 'scrollSpeed') value = Number(value);
+  await saveSetting({ [key]: value }, (c) => c[key] === value);
+});
+
+// Enregistrement d'un raccourci : la combinaison tapée est capturée avant tout le reste.
+window.addEventListener(
+  'keydown',
+  (e) => {
+    if (!S.recording) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (['Meta', 'Control', 'Alt', 'Shift'].includes(e.key)) return; // on attend la touche principale
+    if (e.key === 'Escape') return stopRecording();
+    if ((e.key === 'Backspace' || e.key === 'Delete') && !e.metaKey && !e.ctrlKey && !e.altKey) return finishRecording('');
+    const acc = acceleratorFromEvent(e);
+    if (acc) finishRecording(acc);
+    else toast('Ajoute au moins une touche ⌘, ⌃ ou ⌥');
+  },
+  true,
+);
+
 // Maintenir ⌘ affiche les numéros des sessions.
 window.addEventListener('keydown', (e) => e.key === 'Meta' && document.body.classList.add('show-numbers'), true);
 window.addEventListener('keyup', (e) => e.key === 'Meta' && document.body.classList.remove('show-numbers'), true);
@@ -1244,6 +1412,8 @@ deck.on('deck:select', (key) => {
 
 deck.on('deck:config', (config) => {
   S.config = config;
+  updateShortcutHints();
+  if (S.headSig === 'empty') S.headSig = ''; // écran d'accueil : raccourcis à jour
   applyFont();
   render();
 });
@@ -1257,6 +1427,10 @@ deck.on('deck:command', (name) => {
     searchEl.select();
   } else if (name === 'stats') {
     select('view:stats');
+  } else if (name === 'settings') {
+    openSettings('general');
+  } else if (name === 'settings:perms') {
+    openSettings('perms');
   } else if (name === 'archive') {
     const it = itemByKey(S.selected);
     if (canArchive(it) && !it.archived) archive([it.sessionId]);
@@ -1293,6 +1467,7 @@ setInterval(render, 30000); // durées relatives
 (async function init() {
   const st = await deck.init();
   S.config = st.config;
+  updateShortcutHints();
   S.update = st.update || null;
   S.usage = st.usage || null;
   S.bridge = st.bridge || null;

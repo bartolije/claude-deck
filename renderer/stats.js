@@ -326,3 +326,59 @@ function bindVizTips(container) {
     for (const el of container.querySelectorAll('.xhair, .xhair-dot')) el.setAttribute('visibility', 'hidden');
   });
 }
+
+// --- Autorisations macOS ------------------------------------------------------------------------
+
+function permBadge(state) {
+  const map = {
+    granted: ['ok', '✓ accordé'],
+    denied: ['no', '✕ refusé'],
+    restricted: ['no', '✕ bloqué'],
+    'not-determined': ['wait', '? pas encore demandé'],
+    unknown: ['wait', '? pas encore vérifié'],
+  };
+  const [cls, label] = map[state] || map.unknown;
+  return `<span class="perm-badge perm-${cls}">${label}</span>`;
+}
+
+function permsHtml(p) {
+  if (!p) return '<div class="stats"><p class="msgs-note">Vérification des autorisations…</p></div>';
+  const b = (act, label, cls = '') => `<button class="btn small ${cls}" data-act="perm:${act}">${esc(label)}</button>`;
+  const folders = p.folders.map((f) => `<span class="perm-folder">${esc(f.label)} ${permBadge(f.status)}</span>`).join('');
+  const mic = p.microphone;
+  return `<div class="stats perms">
+    <p class="stats-note">Une appli ne peut pas s’accorder ces droits elle-même : macOS les demande, ou il faut les activer dans les Réglages. Une fois accordés, ils restent valables d’une mise à jour à l’autre. Les programmes lancés dans les terminaux de Claude Deck (Claude Code, serveurs MCP, scripts) en profitent, comme ils profitaient de ceux de Terminal.</p>
+
+    <section class="perm">
+      <div class="perm-head"><h3>Dossiers protégés</h3>${p.fullDisk ? permBadge('granted') : ''}</div>
+      <p>Documents, Bureau et Téléchargements : macOS demande une fois par dossier quand Claude lit un fichier. Tu peux faire toutes les demandes d’un coup maintenant.</p>
+      <div class="perm-folders">${folders}</div>
+      <div class="actions">${p.fullDisk ? '' : b('folders', 'Demander maintenant', 'primary')}${b('files', 'Ouvrir les réglages')}</div>
+    </section>
+
+    <section class="perm">
+      <div class="perm-head"><h3>Accès complet au disque</h3>${permBadge(p.fullDisk ? 'granted' : 'unknown').replace('? pas encore vérifié', '— non activé')}</div>
+      <p>Plus aucune demande pour les fichiers : dossiers protégés, disques externes, données des autres apps. À activer dans les Réglages (bouton +, puis Claude Deck), puis redémarrer Claude Deck.</p>
+      <p class="perm-warn">⚠ Tout ce qui tourne dans tes terminaux pourra alors lire tout le disque, y compris Mail, Messages ou l’historique Safari, sans rien te demander. Avec <code>--dangerously-skip-permissions</code>, Claude le fera sans confirmation. Les autorisations par dossier suffisent en général.</p>
+      <div class="actions">${b('fullDisk', 'Ouvrir les réglages')}${p.fullDisk ? '' : b('relaunch', 'Redémarrer Claude Deck')}</div>
+    </section>
+
+    <section class="perm">
+      <div class="perm-head"><h3>Micro</h3>${permBadge(mic)}</div>
+      <p>Pour le mode vocal de Claude Code dans les terminaux de l’appli.</p>
+      <div class="actions">${mic === 'granted' ? '' : b('microphone', mic === 'not-determined' ? 'Autoriser' : 'Ouvrir les réglages', mic === 'not-determined' ? 'primary' : '')}</div>
+    </section>
+
+    <section class="perm">
+      <div class="perm-head"><h3>Contrôle de Terminal et iTerm2</h3></div>
+      <p>Pour « Afficher dans Terminal » (sélection du bon onglet) : macOS le demande à la première utilisation.</p>
+      <div class="actions">${b('automation', 'Ouvrir les réglages')}</div>
+    </section>
+
+    <section class="perm">
+      <div class="perm-head"><h3>Notifications</h3></div>
+      <p>Pour être prévenu quand une session termine ou t’attend.</p>
+      <div class="actions">${b('notifications', 'Ouvrir les réglages')}</div>
+    </section>
+  </div>`;
+}

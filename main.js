@@ -1,12 +1,12 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, Menu, Tray, Notification, dialog, shell, clipboard, nativeImage, screen, session } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Tray, Notification, dialog, shell, clipboard, nativeImage, screen, session, systemPreferences, globalShortcut } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const sessions = require('./lib/sessions');
 const { PtyManager, shellQuote } = require('./lib/ptys');
-const { Store } = require('./lib/store');
+const { Store, DEFAULT_CONFIG } = require('./lib/store');
 const { Updater, RELEASES_URL } = require('./lib/updater');
 const { Usage } = require('./lib/usage');
 
@@ -398,7 +398,7 @@ function notifyTransitions(list, focused) {
 
 function notify(title, body, key) {
   if (!Notification.isSupported()) return;
-  const n = new Notification({ title, body });
+  const n = new Notification({ title, body, silent: store.config.notificationSound === false });
   liveNotifications.add(n);
   n.on('click', () => {
     liveNotifications.delete(n);
@@ -427,7 +427,7 @@ function counts() {
 function updateIndicators() {
   const c = counts();
   const todo = c.waiting + c.done;
-  if (app.dock) app.dock.setBadge(todo ? String(todo) : '');
+  if (app.dock) app.dock.setBadge(todo && store.config.showDockBadge !== false ? String(todo) : '');
   if (!tray) return;
   const parts = [];
   if (c.waiting) parts.push(`🟠${c.waiting}`);
@@ -808,6 +808,172 @@ async function toggleBridge(enable) {
   return state;
 }
 
+// --- Réglages (vue Réglages de l'appli) -------------------------------------------------------
+
+const ACCELERATOR_RE =
+  /^((CmdOrCtrl|CommandOrControl|Command|Cmd|Control|Ctrl|Alt|Option|Shift|Super)\+)*([A-Z0-9]|F([1-9]|1[0-9]|2[0-4])|Space|Tab|Backspace|Delete|Enter|Return|Up|Down|Left|Right|Home|End|PageUp|PageDown|Escape|[=\-[\];',./`\\])$/;
+const isAccelerator = (v) => v === '' || (typeof v === 'string' && v.length < 60 && ACCELERATOR_RE.test(v));
+
+// Type attendu de chaque réglage modifiable depuis l'interface : rien d'autre n'est accepté.
+const SETTINGS_SCHEMA = {
+  newSessionCommand: 'command',
+  newSessionInFolderCommand: 'command',
+  resumeCommand: 'command',
+  shell: 'path',
+  closedSessionsDays: [1, 30],
+  staleAfterHours: [1, 168],
+  notifications: 'boolean',
+  notificationSound: 'boolean',
+  showTray: 'boolean',
+  showDockBadge: 'boolean',
+  showBackgroundAgents: 'boolean',
+  autoUpdate: 'boolean',
+  fontFamily: 'font',
+  fontSize: [9, 28],
+  lineHeight: [0.8, 2],
+  scrollSpeed: [1, 5],
+  claudeDisplay: ['auto', 'classic', 'fullscreen'],
+  globalShortcut: 'accelerator',
+  shortcuts: 'shortcuts',
+};
+
+function sanitizeSettings(patch) {
+  const out = {};
+  for (const [k, v] of Object.entries(patch || {})) {
+    const rule = SETTINGS_SCHEMA[k];
+    if (!rule) continue;
+    if (rule === 'boolean' && typeof v === 'boolean') out[k] = v;
+    else if (rule === 'command' && typeof v === 'string' && v.trim() && v.length < 500 && !/[\r\n]/.test(v)) out[k] = v.trim();
+    else if (rule === 'path' && typeof v === 'string' && path.isAbsolute(v) && fs.existsSync(v)) out[k] = v;
+    else if (rule === 'font' && typeof v === 'string' && v.trim() && v.length < 200 && !/[;{}<>]/.test(v)) out[k] = v.trim();
+    else if (rule === 'accelerator' && isAccelerator(v)) out[k] = v;
+    else if (Array.isArray(rule) && typeof rule[0] === 'string' && rule.includes(v)) out[k] = v;
+    else if (Array.isArray(rule) && typeof v === 'number' && Number.isFinite(v)) out[k] = Math.min(rule[1], Math.max(rule[0], v));
+    else if (rule === 'shortcuts' && v && typeof v === 'object') {
+      const sc2 = {};
+      for (const [name, acc] of Object.entries(v)) if (name in DEFAULT_CONFIG.shortcuts && isAccelerator(acc)) sc2[name] = acc;
+      out.shortcuts = { ...store.config.shortcuts, ...sc2 };
+    }
+  }
+  return out;
+}
+
+let registeredGlobal = null;
+let globalShortcutOk = true;
+function applyGlobalShortcut() {
+  if (registeredGlobal) globalShortcut.unregister(registeredGlobal);
+  registeredGlobal = null;
+  globalShortcutOk = true;
+  const acc = store.config.globalShortcut;
+  if (!acc) return;
+  try {
+    // Afficher l'appli, ou la masquer si elle est déjà devant.
+    globalShortcutOk = globalShortcut.register(acc, () => {
+      if (win && !win.isDestroyed() && win.isVisible() && win.isFocused()) app.hide();
+      else showWindow();
+    });
+  } catch {
+    globalShortcutOk = false;
+  }
+  if (globalShortcutOk) registeredGlobal = acc;
+}
+
+function applyTray() {
+  if (store.config.showTray === false) {
+    if (tray) tray.destroy();
+    tray = null;
+  } else if (!tray) {
+    if (store.config.showTray !== false) createTray();
+    applyGlobalShortcut();
+    updateIndicators();
+  }
+}
+
+function settingsPayload() {
+  return {
+    config: store.config,
+    defaults: DEFAULT_CONFIG,
+    version: app.getVersion(),
+    packaged: app.isPackaged,
+    loginItem: app.isPackaged ? app.getLoginItemSettings().openAtLogin : null,
+    bridge: usage ? usage.bridgeState() : null,
+    globalShortcutOk,
+    update: updater.state,
+  };
+}
+
+function applySettings(patch) {
+  const clean = sanitizeSettings(patch);
+  if (!Object.keys(clean).length) return settingsPayload();
+  Object.assign(store.config, clean);
+  writeConfig();
+  buildMenu();
+  if ('globalShortcut' in clean) applyGlobalShortcut();
+  if ('showTray' in clean) applyTray();
+  updateIndicators();
+  if ('closedSessionsDays' in clean) scanClosed();
+  send('deck:config', store.config);
+  refreshSoon(50);
+  return settingsPayload();
+}
+
+// --- Autorisations macOS ---------------------------------------------------------------------
+// Une appli ne peut pas s'accorder elle-même ces droits : on affiche leur état, on déclenche les demandes
+// qui existent (dossiers, micro) et on ouvre la bonne page des Réglages pour le reste.
+
+const SETTINGS_PANES = {
+  fullDisk: 'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles',
+  files: 'x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders',
+  microphone: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+  automation: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation',
+  notifications: 'x-apple.systempreferences:com.apple.preference.notifications',
+};
+const PROTECTED_FOLDERS = [
+  ['documents', 'Documents'],
+  ['desktop', 'Bureau'],
+  ['downloads', 'Téléchargements'],
+];
+const folderAccess = {}; // résultat de la dernière demande, par dossier
+
+// L'accès complet au disque ouvre la base des autorisations de macOS ; sans lui, macOS refuse sans rien demander.
+async function hasFullDiskAccess() {
+  try {
+    const fh = await fs.promises.open(path.join(os.homedir(), 'Library', 'Application Support', 'com.apple.TCC', 'TCC.db'), 'r');
+    await fh.close();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function permissionsStatus() {
+  const fullDisk = await hasFullDiskAccess();
+  return {
+    fullDisk,
+    microphone: systemPreferences.getMediaAccessStatus('microphone'),
+    folders: PROTECTED_FOLDERS.map(([id, label]) => ({ id, label, status: fullDisk ? 'granted' : folderAccess[id] || 'unknown' })),
+  };
+}
+
+async function permissionAction(action) {
+  if (action === 'folders') {
+    // Lire un dossier protégé déclenche la demande de macOS (une fois par dossier).
+    for (const [id] of PROTECTED_FOLDERS) {
+      folderAccess[id] = await fs.promises.readdir(app.getPath(id)).then(() => 'granted', () => 'denied');
+    }
+  } else if (action === 'microphone') {
+    const status = systemPreferences.getMediaAccessStatus('microphone');
+    if (status === 'not-determined') await systemPreferences.askForMediaAccess('microphone');
+    else if (status !== 'granted') shell.openExternal(SETTINGS_PANES.microphone);
+  } else if (action === 'relaunch') {
+    app.relaunch();
+    app.quit(); // la confirmation habituelle s'affiche si des sessions tournent dans l'appli
+  } else if (SETTINGS_PANES[action]) {
+    shell.openExternal(SETTINGS_PANES[action]);
+  }
+  return permissionsStatus();
+}
+
 // Activité des 30 derniers jours (transcripts encore présents) + historique des pourcentages d'usage.
 async function computeStats() {
   if (!searchIndex.builtAt || Date.now() - searchIndex.builtAt > 60000) await buildSearchIndex();
@@ -845,6 +1011,17 @@ updater.on('state', (s) => {
   if (s.status === 'ready' && tray) updateIndicators();
 });
 
+// Raccourci configuré pour une action ('' = désactivé, absent = valeur par défaut).
+let recordingShortcut = false; // pendant qu'on tape une combinaison dans les Réglages, les menus ne la captent pas
+const A = (acc) => (recordingShortcut ? undefined : acc);
+
+function sc(name) {
+  if (recordingShortcut) return undefined;
+  const v = store.config.shortcuts && store.config.shortcuts[name];
+  if (v === '') return undefined;
+  return v || DEFAULT_CONFIG.shortcuts[name];
+}
+
 function buildMenu() {
   const template = [
     {
@@ -852,8 +1029,9 @@ function buildMenu() {
       submenu: [
         { role: 'about', label: 'À propos de Claude Deck' },
         { label: 'Rechercher les mises à jour…', click: () => checkUpdatesManually() },
+        { label: 'Autorisations macOS…', click: command('settings:perms') },
         { type: 'separator' },
-        { label: 'Réglages…', accelerator: 'CmdOrCtrl+,', click: () => shell.openPath(store.configFile) },
+        { label: 'Réglages…', accelerator: sc('settings'), click: command('settings') },
         {
           label: 'Ouvrir à l’ouverture de session',
           type: 'checkbox',
@@ -872,31 +1050,31 @@ function buildMenu() {
     {
       label: 'Session',
       submenu: [
-        { label: 'Nouvelle session', accelerator: 'CmdOrCtrl+T', click: () => startNew() },
+        { label: 'Nouvelle session', accelerator: sc('newSession'), click: () => startNew() },
         {
           label: 'Nouvelle session dans un dossier…',
-          accelerator: 'CmdOrCtrl+Shift+T',
+          accelerator: sc('newSessionInFolder'),
           click: async () => {
             const key = await startNewInFolder();
             if (key) select(key);
           },
         },
         { type: 'separator' },
-        { label: 'Rechercher dans les conversations…', accelerator: 'CmdOrCtrl+F', click: command('search') },
-        { label: 'Archiver la session', accelerator: 'Ctrl+Cmd+A', click: command('archive') },
+        { label: 'Rechercher dans les conversations…', accelerator: sc('search'), click: command('search') },
+        { label: 'Archiver la session', accelerator: sc('archive'), click: command('archive') },
         { type: 'separator' },
-        { label: 'Statistiques et usage', accelerator: 'CmdOrCtrl+Shift+U', click: command('stats') },
-        { label: 'Prochaine session à traiter', accelerator: 'CmdOrCtrl+J', click: command('nextAttention') },
-        { label: 'Session suivante', accelerator: 'CmdOrCtrl+Shift+]', click: command('next') },
-        { label: 'Session précédente', accelerator: 'CmdOrCtrl+Shift+[', click: command('prev') },
+        { label: 'Statistiques et usage', accelerator: sc('stats'), click: command('stats') },
+        { label: 'Prochaine session à traiter', accelerator: sc('nextAttention'), click: command('nextAttention') },
+        { label: 'Session suivante', accelerator: sc('nextSession'), click: command('next') },
+        { label: 'Session précédente', accelerator: sc('prevSession'), click: command('prev') },
         ...Array.from({ length: 9 }, (_, i) => ({
           label: `Session ${i + 1}`,
-          accelerator: `CmdOrCtrl+${i + 1}`,
+          accelerator: A(`CmdOrCtrl+${i + 1}`),
           visible: false,
           click: command(`goto:${i}`),
         })),
         { type: 'separator' },
-        { label: 'Fermer la session', accelerator: 'CmdOrCtrl+W', click: command('closeCurrent') },
+        { label: 'Fermer la session', accelerator: sc('closeSession'), click: command('closeCurrent') },
       ],
     },
     {
@@ -908,16 +1086,16 @@ function buildMenu() {
         { role: 'cut', label: 'Couper' },
         { role: 'copy', label: 'Copier' },
         { role: 'paste', label: 'Coller' },
-        { label: 'Tout sélectionner', accelerator: 'CmdOrCtrl+A', click: command('selectAll') },
-        { label: 'Effacer le défilement', accelerator: 'CmdOrCtrl+K', click: command('clear') },
+        { label: 'Tout sélectionner', accelerator: A('CmdOrCtrl+A'), click: command('selectAll') },
+        { label: 'Effacer le défilement', accelerator: A('CmdOrCtrl+K'), click: command('clear') },
       ],
     },
     {
       label: 'Présentation',
       submenu: [
-        { label: 'Agrandir le texte', accelerator: 'CmdOrCtrl+=', click: command('font:+1') },
-        { label: 'Réduire le texte', accelerator: 'CmdOrCtrl+-', click: command('font:-1') },
-        { label: 'Taille réelle', accelerator: 'CmdOrCtrl+0', click: command('font:0') },
+        { label: 'Agrandir le texte', accelerator: A('CmdOrCtrl+='), click: command('font:+1') },
+        { label: 'Réduire le texte', accelerator: A('CmdOrCtrl+-'), click: command('font:-1') },
+        { label: 'Taille réelle', accelerator: A('CmdOrCtrl+0'), click: command('font:0') },
         { type: 'separator' },
         {
           label: 'Vitesse de défilement (molette)',
@@ -954,7 +1132,7 @@ function buildMenu() {
         { type: 'separator' },
         { role: 'togglefullscreen', label: 'Plein écran' },
         { type: 'separator' },
-        { role: 'reload', label: "Recharger l'interface", accelerator: 'CmdOrCtrl+Shift+R' },
+        { role: 'reload', label: "Recharger l'interface", accelerator: A('CmdOrCtrl+Shift+R') },
         { role: 'toggleDevTools', label: 'Outils de développement' },
       ],
     },
@@ -968,6 +1146,23 @@ function buildMenu() {
 function registerIpc() {
   ipcMain.handle('deck:checkUpdate', () => checkUpdatesManually());
   ipcMain.handle('deck:stats', () => computeStats());
+  ipcMain.handle('deck:perms', () => permissionsStatus());
+  ipcMain.handle('deck:settings', () => settingsPayload());
+  ipcMain.handle('deck:settings:set', (_e, patch) => applySettings(patch));
+  ipcMain.handle('deck:loginItem', (_e, enable) => {
+    if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: !!enable });
+    buildMenu();
+    return settingsPayload();
+  });
+  ipcMain.on('deck:openConfigFile', () => shell.openPath(store.configFile));
+  ipcMain.on('deck:recordingShortcut', (_e, on) => {
+    recordingShortcut = !!on;
+    buildMenu();
+    if (recordingShortcut) globalShortcut.unregisterAll();
+    else applyGlobalShortcut();
+  });
+  ipcMain.on('deck:openDataDir', () => shell.openPath(app.getPath('userData')));
+  ipcMain.handle('deck:permAction', (_e, action) => permissionAction(String(action || '')));
   ipcMain.handle('deck:bridge', (_e, enable) => toggleBridge(!!enable));
   ipcMain.on('deck:bridgeDismiss', () => {
     store.state.bridgeDismissed = true;
@@ -1229,6 +1424,7 @@ if (!gotLock) {
 
   // Mise à jour téléchargée : le bundle est remplacé juste après la fermeture (et relancé si demandé).
   app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
     if (updater.staged) updater.installOnExit();
   });
 

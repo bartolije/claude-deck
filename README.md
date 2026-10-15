@@ -53,7 +53,19 @@ redémarrage de l'appli (bouton « Redémarrer » dans la barre latérale).
 
 ## Réglages
 
-`⌘,` ouvre `~/Library/Application Support/Claude Deck/config.json` (rechargé à l'enregistrement).
+`⌘,` ouvre les Réglages de l'appli, enregistrés aussitôt :
+
+- **Général** : ouverture à l'ouverture de session, compteur dans la barre des menus, badge du Dock, notifications
+  (avec ou sans son), suivi du forfait en direct, mises à jour automatiques.
+- **Sessions** : commandes de nouvelle session, de session dans un dossier et de reprise, shell, profondeur de
+  « Fermées récemment », délai de grisage, agents en arrière-plan.
+- **Terminal** : police, taille, interligne, affichage de Claude (plein écran ou classique), vitesse de la molette.
+- **Raccourcis** : tous modifiables (clic, puis la combinaison ; ⌫ pour aucun), doublons signalés, et un raccourci
+  global qui affiche ou masque Claude Deck depuis n'importe quelle appli.
+- **Autorisations** : état des accès macOS et bouton pour les demander ou ouvrir la bonne page des Réglages système.
+- **Avancé** : `config.json` et dossier des données.
+
+Les mêmes réglages sont dans `~/Library/Application Support/Claude Deck/config.json` (rechargé à l'enregistrement) :
 
 | Clé | Défaut | Rôle |
 | --- | --- | --- |
@@ -64,12 +76,15 @@ redémarrage de l'appli (bouton « Redémarrer » dans la barre latérale).
 | `shell` | `$SHELL` | Shell des terminaux intégrés |
 | `closedSessionsDays` | `3` | Profondeur de « Fermées récemment » (la recherche couvre tout l'historique conservé) |
 | `staleAfterHours` | `6` | Au-delà, une session au repos est grisée |
-| `notifications` | `true` | Notifications macOS |
+| `notifications`, `notificationSound` | `true` | Notifications macOS, avec ou sans son |
+| `showTray`, `showDockBadge` | `true` | Compteur dans la barre des menus, badge du Dock |
 | `showBackgroundAgents` | `true` | Section des agents en arrière-plan |
 | `fontFamily`, `fontSize`, `lineHeight` | SF Mono 11, 1 | Police des terminaux (`⌘+`, `⌘−`, `⌘0`) |
 | `scrollSpeed` | `1` | Vitesse de la molette (menu Présentation) |
 | `claudeDisplay` | `auto` | Rendu de Claude : `auto` (ton réglage `/tui`), `classic` (historique et barre de défilement), `fullscreen` |
 | `autoUpdate` | `true` | Recherche des nouvelles versions au démarrage puis toutes les 6 h |
+| `shortcuts` | voir ci-dessous | Raccourcis des menus (accélérateurs Electron, `""` = aucun) |
+| `globalShortcut` | `""` | Raccourci global pour afficher ou masquer l'appli, par exemple `Alt+Space` |
 
 ## Usage du forfait
 
@@ -119,8 +134,10 @@ envoie la conversation dans l'historique du terminal, avec une barre de défilem
 - **Tout reste sur ta machine.** Claude Deck lit les fichiers de Claude Code en local et n'envoie rien. Sa seule
   requête réseau est la vérification des mises à jour sur GitHub. Il ne lit jamais les identifiants de Claude Code.
 - **Autorisations macOS.** Les programmes lancés dans les terminaux de Claude Deck (Claude Code, ses serveurs MCP)
-  sont rattachés à Claude Deck, comme ils l'étaient à Terminal.app : macOS peut demander l'accès à Documents, à
-  Téléchargements ou aux données d'autres apps la première fois.
+  sont rattachés à Claude Deck, comme ils l'étaient à Terminal.app : macOS demande l'accès à Documents, à
+  Téléchargements ou aux données d'autres apps la première fois. Une appli ne peut pas s'accorder ces droits
+  elle-même ; Réglages › Autorisations fait les demandes d'un coup ou ouvre la bonne page des Réglages système.
+  L'accès complet au disque supprime toutes les demandes, mais donne tout le disque à ce qui tourne dans les terminaux.
 - **Mises à jour signées.** Le manifeste `latest.json` est signé en Ed25519 ; la clé publique est embarquée dans
   l'appli, la clé privée ne quitte pas la machine de publication. L'URL de l'archive est construite par l'appli, le
   zip doit avoir l'empreinte SHA-256 annoncée, et l'appli extraite doit porter le même identifiant, la bonne version

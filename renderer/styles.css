@@ -929,6 +929,279 @@ body.show-numbers .row .num {
   display: none;
 }
 
+/* ---- Réglages ----------------------------------------------------------------------------- */
+
+.settings {
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 18px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.tab {
+  flex: 1;
+  height: 30px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.active {
+  background: var(--side-sel);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.s-group {
+  margin-bottom: 18px;
+  padding: 6px 18px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.s-group h3 {
+  margin: 10px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 48px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.s-group h3 + .setting,
+.s-group h3 + .s-hint + .setting {
+  border-top: none;
+}
+
+.setting.col {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.s-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.s-text b {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.s-text small,
+.s-hint {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.s-hint {
+  margin: 4px 0 6px;
+  line-height: 1.5;
+}
+
+.s-warn {
+  color: var(--lvl-warn) !important;
+}
+
+.field {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: #101318;
+  color: var(--text);
+  font: inherit;
+}
+
+.field:focus {
+  outline: none;
+  border-color: #3a4352;
+}
+
+.field.mono {
+  font: 12.5px 'SF Mono', Menlo, monospace;
+}
+
+select.field {
+  max-width: 320px;
+}
+
+.num-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--faint);
+}
+
+.num-field input {
+  width: 80px;
+}
+
+.switch {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  position: relative;
+  width: 38px;
+  height: 22px;
+  margin: 0;
+  border-radius: 999px;
+  background: #2a303a;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #c9ced6;
+  transition: transform 0.15s;
+}
+
+.switch:checked {
+  background: var(--series-1);
+}
+
+.switch:checked::after {
+  transform: translateX(16px);
+  background: #fff;
+}
+
+.switch[data-special='loginItemDisabled'] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.sc-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.shortcut {
+  min-width: 90px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: #101318;
+  color: var(--text);
+  font: 13px var(--ui);
+  cursor: pointer;
+}
+
+.shortcut:hover {
+  border-color: #3a4352;
+}
+
+.shortcut.recording {
+  border-color: var(--series-1);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.perm {
+  margin-bottom: 14px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.perm-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.perm h3 {
+  margin: 0;
+  font-size: 13.5px;
+}
+
+.perm p {
+  margin: 8px 0 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.perm .perm-warn {
+  color: var(--text);
+}
+
+.perm code {
+  font: 11.5px 'SF Mono', Menlo, monospace;
+}
+
+.perm .actions {
+  display: flex;
+  gap: 8px;
+}
+
+.perm-folders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+}
+
+.perm-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.perm-badge.perm-ok {
+  border-color: rgba(46, 194, 126, 0.5);
+  color: var(--text);
+}
+
+.perm-badge.perm-no {
+  border-color: rgba(230, 103, 103, 0.6);
+  color: var(--text);
+}
+
 .restore.bridge {
   background: #1b2333;
   border-color: #2a3a55;
