@@ -430,7 +430,6 @@ function headActions(it) {
     return (
       btn('focus', 'external', `Afficher dans ${it.hostApp || 'son terminal'}`, 'primary', false, 'Entrée') +
       btn('adopt', 'adopt', 'Rapatrier ici', '', busy, busy ? 'Possible quand la session est au repos' : 'Arrête la session dans son terminal et la reprend ici') +
-      (it.state === 'done' ? btn('seen', 'check', 'Marquer comme lue') : '') +
       arch +
       folder +
       copy

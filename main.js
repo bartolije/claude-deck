@@ -193,8 +193,8 @@ async function buildItems() {
 
     // Premier lancement de l'appli : tout ce qui est déjà au repos est considéré comme lu.
     if (store.firstRun && !primed && e.status === 'idle') store.state.seen[e.sessionId] = now;
-    // Session affichée dans l'appli et fenêtre au premier plan : tu la vois, donc elle est lue.
-    if (p && key === selectedKey && focused && changedAt > (store.state.seen[e.sessionId] || 0)) {
+    // Session affichée (terminal ou aperçu de la conversation) et fenêtre au premier plan : elle est lue.
+    if (key === selectedKey && focused && changedAt > (store.state.seen[e.sessionId] || 0)) {
       store.state.seen[e.sessionId] = now;
       seenChanged = true;
     }
@@ -980,7 +980,8 @@ function registerIpc() {
   ipcMain.on('deck:select', (_e, key) => {
     selectedKey = key;
     const it = items.find((i) => i.key === key);
-    if (it && it.sessionId && it.host === 'app') {
+    // Un clic sur une session suffit à la marquer comme lue, qu'elle tourne ici ou dans Terminal.
+    if (it && it.sessionId && it.kind === 'live') {
       store.state.seen[it.sessionId] = Date.now();
       store.saveState();
     }

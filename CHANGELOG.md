@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- Un clic sur une session « terminée » la marque comme lue, y compris pour les sessions qui tournent dans Terminal (plus besoin de « Marquer comme lue »).
+- Une session affichée à l'écran au moment où elle termine est directement considérée comme lue.
+
 ## 0.1.1
 
 - Plus de demande d'accès au trousseau au lancement : l'option de chiffrement des cookies est retirée (l'appli n'en utilise aucun, et la demande serait revenue après chaque mise à jour).
