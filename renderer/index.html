@@ -32,13 +32,17 @@
         <kbd>⌘F</kbd>
       </label>
       <div id="update" class="restore update" hidden></div>
+      <div id="bridge" class="restore bridge" hidden></div>
       <div id="restore" class="restore" hidden></div>
       <nav id="list" class="list" aria-label="Sessions"></nav>
-      <footer class="legend">
-        <span><i class="dot s-waiting"></i>attend</span>
-        <span><i class="dot s-done"></i>terminée</span>
-        <span><i class="dot s-busy"></i>en cours</span>
-        <span><i class="dot s-idle"></i>au repos</span>
+      <footer class="side-foot">
+        <button id="usage" class="usage" title="Statistiques et usage (⇧⌘U)"></button>
+        <div class="legend">
+          <span><i class="dot s-waiting"></i>attend</span>
+          <span><i class="dot s-done"></i>terminée</span>
+          <span><i class="dot s-busy"></i>en cours</span>
+          <span><i class="dot s-idle"></i>au repos</span>
+        </div>
       </footer>
     </aside>
 
@@ -57,6 +61,7 @@
     <script src="../node_modules/@xterm/addon-unicode11/lib/addon-unicode11.js"></script>
     <script src="../node_modules/@xterm/addon-web-links/lib/addon-web-links.js"></script>
     <script src="../node_modules/@xterm/addon-clipboard/lib/addon-clipboard.js"></script>
+    <script src="stats.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

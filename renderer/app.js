@@ -6,6 +6,8 @@ const listEl = $('#list');
 const summaryEl = $('#summary');
 const restoreEl = $('#restore');
 const updateEl = $('#update');
+const bridgeEl = $('#bridge');
+const usageEl = $('#usage');
 const searchEl = $('#search');
 const headEl = $('#pane-head');
 const termHost = $('#term-host');
@@ -31,6 +33,11 @@ const S = {
   bodySig: '',
   update: null,
   updateDismissed: null,
+  usage: null,
+  bridge: null,
+  bridgeDismissed: false,
+  stats: null,
+  statsAt: 0,
 };
 
 // --- Libellés -------------------------------------------------------------------------
@@ -257,6 +264,7 @@ function navOrder(groups = grouped()) {
 
 function itemByKey(key) {
   if (!key) return null;
+  if (key === 'view:stats') return { key, kind: 'view', title: 'Statistiques et usage' };
   const it = S.items.find((i) => i.key === key) || (S.results && S.results.find((i) => i.key === key));
   if (it) return it;
   if (S.snapshot && S.snapshot.key === key) return S.snapshot;
@@ -275,6 +283,8 @@ const canArchive = (it) => !!it && !!it.sessionId && it.host !== 'app';
 function render() {
   renderSummary();
   renderUpdate();
+  renderBridge();
+  renderUsage();
   renderRestore();
   renderList();
   renderPane();
@@ -310,6 +320,26 @@ function renderUpdate() {
       <button class="btn primary" data-act="installUpdate">Redémarrer</button>
       <button class="btn ghost" data-act="releaseNotes">Nouveautés</button>
       <button class="btn ghost" data-act="dismissUpdate">Plus tard</button>
+    </div>`;
+}
+
+function renderUsage() {
+  usageEl.innerHTML = usageFooterHtml(S.usage, S.bridge);
+  usageEl.classList.toggle('selected', S.selected === 'view:stats');
+}
+
+function renderBridge() {
+  const b = S.bridge;
+  if (!b || b.installed || b.error || S.bridgeDismissed) {
+    bridgeEl.hidden = true;
+    return;
+  }
+  bridgeEl.hidden = false;
+  bridgeEl.innerHTML = `<strong>Suivre ton forfait en direct</strong>
+    <div class="update-notes">Session et semaine comme /usage, mis à jour après chaque réponse de Claude.</div>
+    <div class="actions">
+      <button class="btn primary" data-act="enableBridge">Activer</button>
+      <button class="btn ghost" data-act="dismissBridge">Plus tard</button>
     </div>`;
 }
 
@@ -352,6 +382,7 @@ function rowHtml(it, idx, tokens = []) {
     (it.host === 'external' ? `<span class="badge">${esc(it.hostApp || 'externe')}</span>` : '') +
     (it.archived && S.results ? '<span class="badge">archivée</span>' : '');
   const folder = it.cwd ? `<span>${esc(folderName(it.cwd))}</span><span>·</span>` : '';
+  const branch = it.branch ? `<span class="branch">⎇ ${esc(it.branch)}</span><span>·</span>` : '';
   const num = idx >= 0 && idx < 9 ? `<span class="num">⌘${idx + 1}</span>` : '';
   const when = S.results && it.kind === 'closed' ? fmtTime(it.since) : ago(it.since);
   const snippet = it.snippet ? `<div class="row-snippet">${highlight(it.snippet, tokens)}</div>` : '';
@@ -359,9 +390,10 @@ function rowHtml(it, idx, tokens = []) {
     <i class="dot s-${it.state}"></i>
     <div class="row-main">
       <div class="row-title">${highlight(it.title, tokens)}</div>
-      <div class="row-sub">${badges}${folder}<span class="status">${esc(statusText(it))}</span></div>
+      <div class="row-sub">${badges}${folder}${branch}<span class="status">${esc(statusText(it))}</span></div>
     </div>
-    <div class="row-side"><span class="row-time">${esc(when)}</span>${num}<span class="row-actions">${rowActions(it)}</span></div>
+    <div class="row-side"><span class="row-time">${esc(when)}</span>${num}${ctxMini(it)}<span class="row-actions">${rowActions(it)}</span></div>
+    ${it.state === 'busy' && it.activity ? `<div class="row-activity">↳ ${esc(it.activity)}</div>` : ''}
     ${snippet}
   </div>`;
 }
@@ -451,6 +483,7 @@ function headActions(it) {
 function headHtml(it) {
   return `${pillHtml(it)}
     <div class="title"><h1>${esc(it.title)}</h1><span class="meta">${esc(homeify(it.cwd))}</span></div>
+    ${headStats(it)}
     <div class="actions">${headActions(it)}</div>`;
 }
 
@@ -553,8 +586,28 @@ function renderPane(force = false) {
   }
   emptyEl.hidden = true;
   headEl.hidden = false;
+  if (it.kind === 'view') {
+    termHost.hidden = true;
+    cardEl.hidden = false;
+    S.visiblePty = null;
+    if (force || S.headSig !== 'view:stats') {
+      headEl.innerHTML = `<span class="pill"><i class="dot s-idle"></i>Statistiques</span>
+        <div class="title"><h1>Usage et activité</h1><span class="meta">30 derniers jours</span></div>
+        <div class="actions">${btn('refreshStats', '', 'Actualiser')}</div>`;
+    }
+    S.headSig = 'view:stats';
+    if (!S.stats || Date.now() - S.statsAt > 60000) loadStats();
+    const bodySig = `stats:${S.statsAt}`;
+    if (force || bodySig !== S.bodySig) {
+      const entering = !S.bodySig.startsWith('stats:');
+      cardEl.innerHTML = statsHtml(S.stats, cardEl.clientWidth - 64);
+      if (entering) cardEl.scrollTop = 0;
+    }
+    S.bodySig = bodySig;
+    return;
+  }
   // On ne réécrit que ce qui change (préserve la sélection de texte et le défilement).
-  const headSig = JSON.stringify([it.key, it.state, it.title, it.cwd, it.archived, it.waitingFor, it.stale, it.hostApp, it.lastSessionId]);
+  const headSig = JSON.stringify([it.key, it.state, it.title, it.cwd, it.archived, it.waitingFor, it.stale, it.hostApp, it.lastSessionId, it.context, it.branch, it.turnActions, it.state === 'busy' ? ago(it.since) : 0]);
   if (force || headSig !== S.headSig) headEl.innerHTML = headHtml(it);
   S.headSig = headSig;
 
@@ -658,6 +711,21 @@ async function runAction(act, it) {
       return deck.installUpdate();
     case 'releaseNotes':
       return deck.openReleases();
+    case 'enableBridge':
+      S.bridge = await deck.setBridge(true);
+      if (S.selected === 'view:stats') loadStats();
+      return render();
+    case 'disableBridge':
+      S.bridge = await deck.setBridge(false);
+      loadStats();
+      return render();
+    case 'dismissBridge':
+      S.bridgeDismissed = true;
+      deck.dismissBridge();
+      toast('Activable plus tard dans le menu Présentation › Barre d’état Claude Code');
+      return render();
+    case 'refreshStats':
+      return loadStats();
     case 'dismissUpdate':
       S.updateDismissed = S.update && S.update.latest;
       toast('La mise à jour s’installera à la prochaine fermeture de l’appli');
@@ -724,6 +792,20 @@ function primaryAction(it) {
   else if (it.kind === 'closed') runAction('resume', it);
   else if (it.kind === 'background') runAction('attach', it);
   else if (it.host === 'external') runAction('focus', it);
+}
+
+let statsLoading = false;
+async function loadStats() {
+  if (statsLoading) return;
+  statsLoading = true;
+  try {
+    S.stats = await deck.stats();
+    S.statsAt = Date.now();
+    if (S.bridge == null && S.stats) S.bridge = S.stats.bridge;
+  } finally {
+    statsLoading = false;
+  }
+  if (S.selected === 'view:stats') renderPane();
 }
 
 // --- Recherche -------------------------------------------------------------------------------------
@@ -1043,7 +1125,17 @@ listEl.addEventListener('dblclick', (e) => {
   primaryAction(row && itemByKey(row.dataset.key));
 });
 
-for (const el of [headEl, cardEl, emptyEl, restoreEl, updateEl]) {
+usageEl.addEventListener('click', () => select('view:stats'));
+// Les graphiques sont dessinés à la largeur affichée : on les redessine quand la fenêtre change de taille.
+let statsResizeTimer = null;
+new ResizeObserver(() => {
+  if (S.selected !== 'view:stats') return;
+  clearTimeout(statsResizeTimer);
+  statsResizeTimer = setTimeout(() => renderPane(true), 150);
+}).observe(cardEl);
+bindVizTips(cardEl);
+
+for (const el of [headEl, cardEl, emptyEl, restoreEl, updateEl, bridgeEl]) {
   el.addEventListener('click', (e) => {
     const act = e.target.closest('[data-act]');
     if (act && !act.disabled) runAction(act.dataset.act, itemByKey(S.selected));
@@ -1125,6 +1217,21 @@ deck.on('deck:items', (items) => {
   render();
 });
 
+deck.on('deck:usage', (u) => {
+  S.usage = u;
+  renderUsage();
+  if (S.selected === 'view:stats' && S.stats) {
+    S.stats.usage = u;
+    S.statsAt = Date.now();
+    renderPane();
+  }
+});
+
+deck.on('deck:bridge', (b) => {
+  S.bridge = b;
+  render();
+});
+
 deck.on('deck:update', (u) => {
   S.update = u;
   renderUpdate();
@@ -1148,6 +1255,8 @@ deck.on('deck:command', (name) => {
   else if (name === 'search') {
     searchEl.focus();
     searchEl.select();
+  } else if (name === 'stats') {
+    select('view:stats');
   } else if (name === 'archive') {
     const it = itemByKey(S.selected);
     if (canArchive(it) && !it.archived) archive([it.sessionId]);
@@ -1185,6 +1294,9 @@ setInterval(render, 30000); // durées relatives
   const st = await deck.init();
   S.config = st.config;
   S.update = st.update || null;
+  S.usage = st.usage || null;
+  S.bridge = st.bridge || null;
+  S.bridgeDismissed = !!st.bridgeDismissed;
   S.collapsed = st.collapsed || {};
   S.lastOpen = st.lastOpen || [];
   S.items = st.items || [];

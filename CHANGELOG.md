@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.0
+
+- Jauge de contexte sur chaque session : part de la fenêtre utilisée (orange dès 70 %, rouge dès 90 %), dans la liste et l'en-tête.
+- Ce que Claude fait en ce moment sous chaque session en cours (« Bash · npm test », « Edit · main.js »), avec la durée et le nombre d'actions du tour.
+- Branche git de la session.
+- Forfait Claude en bas de la barre latérale : session de 5 h et semaine, comme /usage, avec l'heure de remise à zéro.
+- Barre d'état « pont » (à activer) : pourcentages en direct après chaque réponse de Claude, et ligne « Contexte · Session · Semaine » dans tes terminaux.
+- Vue Statistiques (⇧⌘U) : rythme de consommation, historique des pourcentages, activité sur 30 jours, répartition par dossier.
+- Signature avec une identité stable : macOS garde les autorisations de l'appli d'une mise à jour à l'autre (après une dernière demande avec cette version), et les mises à jour doivent porter cette même signature.
+
 ## 0.1.2
 
 - Un clic sur une session « terminée » la marque comme lue, y compris pour les sessions qui tournent dans Terminal (plus besoin de « Marquer comme lue »).

@@ -2,7 +2,18 @@
 
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
-const EVENTS = ['deck:items', 'deck:select', 'deck:command', 'deck:config', 'deck:update', 'pty:created', 'pty:data', 'pty:exit'];
+const EVENTS = [
+  'deck:items',
+  'deck:select',
+  'deck:command',
+  'deck:config',
+  'deck:update',
+  'deck:usage',
+  'deck:bridge',
+  'pty:created',
+  'pty:data',
+  'pty:exit',
+];
 
 contextBridge.exposeInMainWorld('deck', {
   init: () => ipcRenderer.invoke('deck:init'),
@@ -28,6 +39,9 @@ contextBridge.exposeInMainWorld('deck', {
   openPath: (p) => ipcRenderer.send('deck:openPath', p),
   copy: (text) => ipcRenderer.send('deck:copy', text),
   checkUpdate: () => ipcRenderer.invoke('deck:checkUpdate'),
+  stats: () => ipcRenderer.invoke('deck:stats'),
+  setBridge: (enable) => ipcRenderer.invoke('deck:bridge', enable),
+  dismissBridge: () => ipcRenderer.send('deck:bridgeDismiss'),
   installUpdate: () => ipcRenderer.send('deck:installUpdate'),
   openReleases: () => ipcRenderer.send('deck:openReleases'),
   ptyWrite: (id, data) => ipcRenderer.send('pty:write', id, data),

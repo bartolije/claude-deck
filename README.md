@@ -29,6 +29,11 @@ history search and one-click resume. The interface is in French.*
 - **Archivage** (`⌃⌘A`) : la conversation sort de la liste et revient d'elle-même si elle reprend vie.
 - **Sessions de Terminal.app** : « Afficher » sélectionne le bon onglet ; « Rapatrier » arrête la session là-bas et
   la reprend dans Claude Deck.
+- **Suivi de chaque session** : contexte utilisé (jauge orange dès 70 %, rouge dès 90 %), ce que Claude fait en ce
+  moment (« Bash · npm test », « Edit · main.js »), durée et nombre d'actions du tour en cours, branche git.
+- **Forfait Claude** : pourcentages de la session de 5 h et de la semaine, comme `/usage`, avec l'heure de remise à
+  zéro et le rythme (« à ce rythme, 100 % vers 15:20 »). Vue **Statistiques** (`⇧⌘U`) : historique des pourcentages,
+  activité sur 30 jours, répartition par dossier.
 - **Notifications** quand une session termine ou t'attend, **badge du Dock** et **compteur dans la barre des menus**.
 - **Mises à jour automatiques** depuis les releases GitHub, signées.
 
@@ -66,6 +71,19 @@ redémarrage de l'appli (bouton « Redémarrer » dans la barre latérale).
 | `claudeDisplay` | `auto` | Rendu de Claude : `auto` (ton réglage `/tui`), `classic` (historique et barre de défilement), `fullscreen` |
 | `autoUpdate` | `true` | Recherche des nouvelles versions au démarrage puis toutes les 6 h |
 
+## Usage du forfait
+
+Claude Deck ne lit jamais tes identifiants Claude. Les pourcentages viennent de deux sources :
+
+- **Le cache de `/usage`** : Claude Code garde dans `~/.claude.json` le dernier relevé fait par `/usage`. Toujours
+  disponible, mais seulement aussi frais que ton dernier `/usage`.
+- **La barre d'état « pont »** (bandeau « Suivre ton forfait en direct », ou menu Présentation › Barre d'état Claude
+  Code) : Claude Deck déclare une barre d'état dans `~/.claude/settings.json` (sauvegardé avant modification dans
+  `settings.json.claude-deck-backup`). Après chaque réponse, Claude Code lui transmet le contexte et tes limites
+  d'usage ; elle les enregistre dans `~/Library/Application Support/Claude Deck/status/` et affiche une ligne
+  `Contexte · Session · Semaine` en bas de tes sessions. Si tu avais déjà une barre d'état, c'est elle qui reste
+  affichée. La décocher remet `settings.json` comme avant.
+
 ## Raccourcis
 
 | Raccourci | Action |
@@ -74,6 +92,7 @@ redémarrage de l'appli (bouton « Redémarrer » dans la barre latérale).
 | `⌘F` | Rechercher (↑ ↓ pour parcourir, Entrée, Échap) |
 | `↩` | Action principale : reprendre, afficher, ouvrir |
 | `⌃⌘A` | Archiver |
+| `⇧⌘U` | Statistiques et usage du forfait |
 | `⌘J` | Prochaine session qui t'attend |
 | `⌘1` … `⌘9` | Aller à une session (maintenir `⌘` affiche les numéros) |
 | `⇧⌘]` / `⇧⌘[` | Session suivante / précédente |
@@ -98,11 +117,15 @@ envoie la conversation dans l'historique du terminal, avec une barre de défilem
 ## Confidentialité et sécurité
 
 - **Tout reste sur ta machine.** Claude Deck lit les fichiers de Claude Code en local et n'envoie rien. Sa seule
-  requête réseau est la vérification des mises à jour sur GitHub.
+  requête réseau est la vérification des mises à jour sur GitHub. Il ne lit jamais les identifiants de Claude Code.
+- **Autorisations macOS.** Les programmes lancés dans les terminaux de Claude Deck (Claude Code, ses serveurs MCP)
+  sont rattachés à Claude Deck, comme ils l'étaient à Terminal.app : macOS peut demander l'accès à Documents, à
+  Téléchargements ou aux données d'autres apps la première fois.
 - **Mises à jour signées.** Le manifeste `latest.json` est signé en Ed25519 ; la clé publique est embarquée dans
   l'appli, la clé privée ne quitte pas la machine de publication. L'URL de l'archive est construite par l'appli, le
   zip doit avoir l'empreinte SHA-256 annoncée, et l'appli extraite doit porter le même identifiant, la bonne version
-  et une signature de code valide. Le remplacement se fait après la fermeture, avec retour arrière en cas d'échec.
+  et une signature de code valide, émise par la même identité que l'appli installée. Le remplacement se fait après la
+  fermeture, avec retour arrière en cas d'échec.
 - **Electron verrouillé** : isolation de contexte, sandbox, CSP stricte, aucune navigation ni fenêtre externe,
   permissions web refusées, fusibles `RunAsNode`, `NODE_OPTIONS` et `--inspect` désactivés, débogage distant refusé.
   Les programmes des terminaux peuvent écrire dans le presse-papiers (OSC 52) mais pas le lire.
@@ -127,8 +150,11 @@ Structure :
 
 ### Publier une version
 
-1. Une fois : `node scripts/gen-update-key.js` crée la clé de signature dans `~/.config/claude-deck/` (à sauvegarder)
-   et la clé publique dans `assets/`.
+1. Une fois : `node scripts/gen-update-key.js` crée la clé de signature des mises à jour dans `~/.config/claude-deck/`
+   et la clé publique dans `assets/` ; `bash scripts/setup-signing.sh` crée l'identité de signature de code (certificat
+   auto-signé dans un trousseau dédié du même dossier). Sauvegarder `~/.config/claude-deck/` : sans ces deux clés, les
+   versions installées refusent les mises à jour. L'identité stable permet à macOS de garder les autorisations de
+   l'appli (contrôle de Terminal, dossiers…) d'une version à l'autre.
 2. Mettre à jour `version` dans `package.json`, ajouter la section `## <version>` en tête de `CHANGELOG.md`, committer.
 3. `npm run release` : construit l'appli, le zip, le DMG et `latest.json` signé, pousse le tag et crée la release.
    `npm run release:dry` fait tout sauf publier.

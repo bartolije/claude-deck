@@ -19,7 +19,17 @@ npx electron-packager . 'Claude Deck' \
   --ignore='node-pty/prebuilds/(win32|darwin-x64)'
 
 node scripts/fuses.js "$APP"
-codesign --force --deep --sign - "$APP"
+
+# Signature : identité locale stable si elle existe (scripts/setup-signing.sh), sinon ad hoc.
+# Avec l'identité stable, macOS garde les autorisations de l'appli d'une version à l'autre.
+SIGN_DIR="${CLAUDE_DECK_CONFIG:-$HOME/.config/claude-deck}"
+if [ -f "$SIGN_DIR/signing.keychain-db" ] && [ -f "$SIGN_DIR/signing.pass" ]; then
+  security unlock-keychain -p "$(cat "$SIGN_DIR/signing.pass")" "$SIGN_DIR/signing.keychain-db"
+  codesign --force --deep --keychain "$SIGN_DIR/signing.keychain-db" --sign "Claude Deck Local Signing" "$APP"
+else
+  echo "Pas d'identité locale : signature ad hoc (les autorisations macOS ne survivront pas aux mises à jour)."
+  codesign --force --deep --sign - "$APP"
+fi
 codesign --verify --deep --strict "$APP"
 # Seule la copie installée doit être connue de macOS (Dock, Spotlight, « Ouvrir avec »).
 "$LSREGISTER" -u "$APP" 2>/dev/null || true

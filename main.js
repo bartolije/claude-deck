@@ -8,6 +8,7 @@ const sessions = require('./lib/sessions');
 const { PtyManager, shellQuote } = require('./lib/ptys');
 const { Store } = require('./lib/store');
 const { Updater, RELEASES_URL } = require('./lib/updater');
+const { Usage } = require('./lib/usage');
 
 app.setName('Claude Deck');
 
@@ -20,7 +21,7 @@ if (app.isPackaged && ['remote-debugging-port', 'remote-debugging-pipe', 'inspec
 const REFRESH_MS = 1000;
 const CLOSED_SCAN_MS = 20000;
 const BACKGROUND_SCAN_MS = 60000;
-const LIVE_META_MAX_AGE_MS = 4000;
+const LIVE_META_MAX_AGE_MS = 2500;
 const SESSION_ID_RE = /^[0-9a-f-]{36}$/i;
 const BG_ID_RE = /^[\w-]{4,64}$/;
 
@@ -33,6 +34,9 @@ const updater = new Updater({ isEnabled: () => store && store.config.autoUpdate 
 
 let items = [];
 let lastPayload = '';
+let usage = null; // usage du forfait + barre d'état « pont »
+let usageNow = null;
+let lastUsagePayload = '';
 let closedCache = [];
 let bgCache = [];
 let lastBgScan = 0;
@@ -105,6 +109,32 @@ function titleOf(e, meta, p) {
   );
 }
 
+// Contexte occupé : la barre d'état « pont » donne la valeur exacte de Claude Code ; sinon on la calcule
+// depuis le transcript (jetons du dernier appel / taille de la fenêtre).
+function contextOf(meta, st) {
+  const cw = st && st.context_window;
+  if (cw && cw.used_percentage != null && (!meta || st.ts >= meta.mtimeMs - 30000)) {
+    return { pct: Math.round(cw.used_percentage), tokens: cw.total_input_tokens || null, window: cw.context_window_size || null };
+  }
+  if (meta && meta.contextTokens != null && meta.contextWindow) {
+    return { pct: Math.round((100 * meta.contextTokens) / meta.contextWindow), tokens: meta.contextTokens, window: meta.contextWindow };
+  }
+  return null;
+}
+
+// Ce que Claude fait pendant un tour : dernier outil appelé, ou rédaction de la réponse.
+function activityOf(meta) {
+  if (!meta) return null;
+  if (meta.lastBlock === 'text') return 'rédige la réponse';
+  if (meta.lastBlock === 'thinking') return 'réfléchit';
+  if (meta.lastTool) {
+    const name = meta.lastTool.name || '';
+    const label = name.startsWith('mcp__') ? meta.lastTool.detail : meta.lastTool.detail ? `${name} · ${meta.lastTool.detail}` : name;
+    return label || null;
+  }
+  return null;
+}
+
 // waiting / busy viennent directement de Claude Code ; « terminé » = au repos avec du nouveau depuis
 // la dernière fois que tu as regardé la session.
 function liveState(e, meta, seenAt) {
@@ -149,6 +179,7 @@ async function buildItems() {
   const now = Date.now();
   const cfg = store.config;
   const reg = (await sessions.readRegistry()).filter((e) => sessions.isAlive(e.pid));
+  const status = usage ? await usage.sessionStatus() : new Map();
   const info = await sessions.processInfo(reg.map((e) => e.pid));
   const ptyByTty = new Map(ptys.list().map((p) => [p.tty, p]));
   const focused = !!(win && !win.isDestroyed() && win.isVisible() && win.isFocused());
@@ -232,6 +263,11 @@ async function buildItems() {
       startedAt: e.startedAt || null,
       stale: (state === 'idle' || state === 'ready') && now - changedAt > cfg.staleAfterHours * 3600000,
       archived: p ? false : isArchived(e.sessionId, changedAt),
+      context: contextOf(meta, status.get(e.sessionId)),
+      activity: e.status === 'busy' ? activityOf(meta) : null,
+      turnActions: meta ? meta.turnActions || 0 : 0,
+      turnPartial: meta ? !!meta.turnPartial : false,
+      branch: meta ? meta.gitBranch || null : null,
     });
   }
 
@@ -269,6 +305,8 @@ async function buildItems() {
       cwd: c.cwd,
       title: c.customTitle || c.aiTitle || shorten(c.lastPrompt) || c.sessionId.slice(0, 8),
       lastPrompt: c.lastPrompt,
+      context: contextOf(c, null),
+      branch: c.gitBranch || null,
       state: 'closed',
       waitingFor: null,
       since: c.mtimeMs,
@@ -304,6 +342,14 @@ async function buildItems() {
   if (store.firstRun && !primed) store.saveState();
   notifyTransitions(out, focused);
   primed = true;
+
+  const u = usage ? usage.current(status) : null;
+  const up = JSON.stringify(u);
+  if (up !== lastUsagePayload) {
+    lastUsagePayload = up;
+    usageNow = u;
+    send('deck:usage', u);
+  }
 
   const payload = JSON.stringify(out);
   if (payload !== lastPayload) {
@@ -388,7 +434,9 @@ function updateIndicators() {
   if (c.done) parts.push(`🟢${c.done}`);
   if (c.busy) parts.push(`🔵${c.busy}`);
   tray.setTitle(parts.length ? ` ${parts.join(' ')}` : '', { fontType: 'monospacedDigit' });
-  tray.setToolTip(`Claude Deck — ${c.waiting} en attente, ${c.done} terminée(s), ${c.busy} en cours`);
+  const pctText = (w) => (w && w.pct != null ? `${Math.round(w.pct)} %` : '—');
+  const usageText = usageNow ? ` · forfait : session ${pctText(usageNow.session)}, semaine ${pctText(usageNow.week)}` : '';
+  tray.setToolTip(`Claude Deck — ${c.waiting} en attente, ${c.done} terminée(s), ${c.busy} en cours${usageText}`);
 
   const live = items.filter((i) => (i.kind === 'live' || i.kind === 'shell') && !i.archived);
   const order = { waiting: 0, done: 1, busy: 2, starting: 2, ready: 3, idle: 3, shell: 4 };
@@ -507,7 +555,8 @@ function buildSearchIndex() {
       const prompts = h && h.prompts.length ? h.prompts : m.lastPrompt ? [{ text: m.lastPrompt, ts: m.mtimeMs }] : [];
       const title = m.customTitle || m.aiTitle || shorten(m.lastPrompt) || m.sessionId.slice(0, 8);
       const cwd = m.cwd || (h && h.project) || null;
-      const answers = await sessions.answersText(m.file);
+      const digest = await sessions.transcriptDigest(m.file);
+      const answers = digest.answers;
       entries.push({
         sessionId: m.sessionId,
         cwd,
@@ -516,6 +565,7 @@ function buildSearchIndex() {
         mtimeMs: m.mtimeMs,
         prompts,
         answers,
+        days: digest.days,
         n: { title: norm(title), cwd: norm(cwd), prompts: prompts.map((p) => norm(p.text)), answers: norm(answers) },
       });
     }
@@ -723,6 +773,73 @@ async function checkUpdatesManually() {
   }
 }
 
+// --- Usage du forfait et statistiques ---------------------------------------------------------
+
+async function toggleBridge(enable) {
+  if (!usage) return null;
+  try {
+    if (enable) {
+      const st = usage.bridgeState();
+      if (st.error) throw new Error(st.error);
+      const { response } = await confirmBox({
+        type: 'question',
+        buttons: ['Activer', 'Annuler'],
+        defaultId: 0,
+        cancelId: 1,
+        message: 'Afficher l’usage de ton forfait en direct ?',
+        detail:
+          'Claude Deck ajoute une barre d’état à Claude Code, dans ~/.claude/settings.json (sauvegardé avant modification). ' +
+          'Après chaque réponse, Claude Code lui transmet le contexte utilisé et tes limites d’usage (session de 5 h, semaine). ' +
+          'Elle les enregistre sur ton Mac pour Claude Deck et affiche une ligne « Contexte · Session · Semaine » en bas de tes sessions Claude, ' +
+          'y compris dans Terminal.' +
+          (st.other ? '\n\nTa barre d’état actuelle reste affichée à la place de cette ligne.' : '') +
+          '\n\nLes sessions déjà ouvertes la prendront au plus tard à leur prochain lancement. Désactivable dans le menu Présentation.',
+      });
+      if (response === 0) usage.installBridge();
+    } else {
+      usage.uninstallBridge();
+    }
+  } catch (err) {
+    await confirmBox({ type: 'error', message: 'Modification de la barre d’état impossible', detail: err.message });
+  }
+  buildMenu(); // remet la coche du menu à jour (y compris après « Annuler »)
+  const state = usage.bridgeState();
+  send('deck:bridge', state);
+  return state;
+}
+
+// Activité des 30 derniers jours (transcripts encore présents) + historique des pourcentages d'usage.
+async function computeStats() {
+  if (!searchIndex.builtAt || Date.now() - searchIndex.builtAt > 60000) await buildSearchIndex();
+  const since = Date.now() - 30 * 86400000;
+  const days = {};
+  const projects = {};
+  for (const e of searchIndex.entries) {
+    const name = e.cwd ? path.basename(e.cwd) : '—';
+    for (const [day, v] of Object.entries(e.days || {})) {
+      if (new Date(`${day}T12:00:00`).getTime() < since) continue;
+      const d = (days[day] ||= { requests: 0, output: 0, input: 0, sessions: 0 });
+      d.requests += v.requests;
+      d.output += v.output;
+      d.input += v.input;
+      d.sessions += 1;
+      const p = (projects[name] ||= { requests: 0, sessions: new Set() });
+      p.requests += v.requests;
+      p.sessions.add(e.sessionId);
+    }
+  }
+  return {
+    usage: usageNow,
+    bridge: usage ? usage.bridgeState() : null,
+    history: usage ? usage.history : [],
+    days,
+    projects: Object.entries(projects)
+      .map(([name, p]) => ({ name, requests: p.requests, sessions: p.sessions.size }))
+      .sort((a, b) => b.requests - a.requests)
+      .slice(0, 8),
+  };
+}
+
 updater.on('state', (s) => {
   send('deck:update', s);
   if (s.status === 'ready' && tray) updateIndicators();
@@ -768,6 +885,7 @@ function buildMenu() {
         { label: 'Rechercher dans les conversations…', accelerator: 'CmdOrCtrl+F', click: command('search') },
         { label: 'Archiver la session', accelerator: 'Ctrl+Cmd+A', click: command('archive') },
         { type: 'separator' },
+        { label: 'Statistiques et usage', accelerator: 'CmdOrCtrl+Shift+U', click: command('stats') },
         { label: 'Prochaine session à traiter', accelerator: 'CmdOrCtrl+J', click: command('nextAttention') },
         { label: 'Session suivante', accelerator: 'CmdOrCtrl+Shift+]', click: command('next') },
         { label: 'Session précédente', accelerator: 'CmdOrCtrl+Shift+[', click: command('prev') },
@@ -815,6 +933,12 @@ function buildMenu() {
           })),
         },
         {
+          label: 'Barre d’état Claude Code (usage en direct)',
+          type: 'checkbox',
+          checked: !!(usage && usage.bridgeState().installed),
+          click: (item) => toggleBridge(item.checked),
+        },
+        {
           label: 'Affichage de Claude (sessions lancées ensuite)',
           submenu: [
             ['auto', 'Selon ton réglage Claude Code (/tui)'],
@@ -843,11 +967,20 @@ function buildMenu() {
 
 function registerIpc() {
   ipcMain.handle('deck:checkUpdate', () => checkUpdatesManually());
+  ipcMain.handle('deck:stats', () => computeStats());
+  ipcMain.handle('deck:bridge', (_e, enable) => toggleBridge(!!enable));
+  ipcMain.on('deck:bridgeDismiss', () => {
+    store.state.bridgeDismissed = true;
+    store.saveState();
+  });
   ipcMain.on('deck:installUpdate', () => installUpdateNow());
   ipcMain.on('deck:openReleases', () => shell.openExternal(`${RELEASES_URL}/latest`));
   ipcMain.handle('deck:init', () => ({
     config: store.config,
     update: updater.state,
+    usage: usageNow,
+    bridge: usage ? usage.bridgeState() : null,
+    bridgeDismissed: !!store.state.bridgeDismissed,
     items,
     selectedKey,
     collapsed: store.state.collapsed || {},
@@ -1073,6 +1206,8 @@ if (!gotLock) {
       credits: 'Projet indépendant, non affilié à Anthropic.',
     });
     store = new Store(app.getPath('userData'));
+    usage = new Usage(app.getPath('userData'));
+    if (usage.bridgeState().installed) usage.writeScript(); // garde le script en phase avec cette version
     if (app.dock) {
       const icon = path.join(__dirname, 'assets', 'icon.png');
       if (fs.existsSync(icon)) app.dock.setIcon(icon);
