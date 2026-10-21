@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2
+
+- Jauge de contexte juste avec les modèles à 1 M de jetons (Opus 5.5, Fable 5.1…). Faute d'information récente de la barre d'état, la jauge supposait une fenêtre de 200 000 jetons : la plupart des sessions affichaient 100 % alors qu'elles en étaient à 15-50 %. La taille de fenêtre transmise par Claude Code est maintenant retenue pour chaque session et chaque modèle.
+
 ## 0.3.1
 
 - Un seul clic suffit pour passer d'une conversation à l'autre. Quand une session tournait, la liste était redessinée jusqu'à une fois par seconde, et le clic se perdait si le rafraîchissement tombait entre l'appui et le relâchement. Même correction pour les compteurs, le forfait, les bandeaux et l'en-tête de la session.

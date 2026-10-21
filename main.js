@@ -111,15 +111,26 @@ function titleOf(e, meta, p) {
 
 // Contexte occupé : la barre d'état « pont » donne la valeur exacte de Claude Code ; sinon on la calcule
 // depuis le transcript (jetons du dernier appel / taille de la fenêtre).
-function contextOf(meta, st) {
+function contextOf(meta, st, sessionId) {
   const cw = st && st.context_window;
   if (cw && cw.used_percentage != null && (!meta || st.ts >= meta.mtimeMs - 30000)) {
     return { pct: Math.round(cw.used_percentage), tokens: cw.total_input_tokens || null, window: cw.context_window_size || null };
   }
   if (meta && meta.contextTokens != null && meta.contextWindow) {
-    return { pct: Math.round((100 * meta.contextTokens) / meta.contextWindow), tokens: meta.contextTokens, window: meta.contextWindow };
+    const window = contextWindowOf(meta, sessionId);
+    return { pct: Math.round((100 * meta.contextTokens) / window), tokens: meta.contextTokens, window };
   }
   return null;
+}
+
+// Le transcript ne donne la fenêtre que pour la bêta context-1m (200 000 supposés sinon), alors que les
+// modèles récents ont 1 M de jetons sans bêta : la taille transmise par Claude Code à la barre d'état
+// (pour la session, ou à défaut pour le modèle) prime, et un contexte plus grand que 200 000 prouve 1 M.
+function contextWindowOf(meta, sessionId) {
+  const beta = meta.contextWindow >= 1000000;
+  const known = usage ? usage.contextWindow(sessionId, beta ? null : meta.model) : null;
+  const window = known || meta.contextWindow;
+  return meta.contextTokens > window ? 1000000 : window;
 }
 
 // Ce que Claude fait pendant un tour : dernier outil appelé, ou rédaction de la réponse.
@@ -263,7 +274,7 @@ async function buildItems() {
       startedAt: e.startedAt || null,
       stale: (state === 'idle' || state === 'ready') && now - changedAt > cfg.staleAfterHours * 3600000,
       archived: p ? false : isArchived(e.sessionId, changedAt),
-      context: contextOf(meta, status.get(e.sessionId)),
+      context: contextOf(meta, status.get(e.sessionId), e.sessionId),
       activity: e.status === 'busy' ? activityOf(meta) : null,
       turnActions: meta ? meta.turnActions || 0 : 0,
       turnPartial: meta ? !!meta.turnPartial : false,
@@ -305,7 +316,7 @@ async function buildItems() {
       cwd: c.cwd,
       title: c.customTitle || c.aiTitle || shorten(c.lastPrompt) || c.sessionId.slice(0, 8),
       lastPrompt: c.lastPrompt,
-      context: contextOf(c, null),
+      context: contextOf(c, null, c.sessionId),
       branch: c.gitBranch || null,
       state: 'closed',
       waitingFor: null,
