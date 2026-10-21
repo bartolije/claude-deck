@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- Un seul clic suffit pour passer d'une conversation à l'autre. Quand une session tournait, la liste était redessinée jusqu'à une fois par seconde, et le clic se perdait si le rafraîchissement tombait entre l'appui et le relâchement. Même correction pour les compteurs, le forfait, les bandeaux et l'en-tête de la session.
+
 ## 0.3.0
 
 - Réglages dans l'appli (⌘,), enregistrés aussitôt : démarrage avec la session, compteur de la barre des menus, badge du Dock, notifications avec ou sans son, mises à jour, commandes de session, police et affichage du terminal.

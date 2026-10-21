@@ -285,6 +285,51 @@ const canArchive = (it) => !!it && !!it.sessionId && it.host !== 'app';
 
 // --- Rendu -----------------------------------------------------------------------------------
 
+// Chromium n'émet pas de « click » si l'élément appuyé quitte le DOM avant le relâchement. Or la
+// liste est réécrite à chaque changement d'état (jusqu'à une fois par seconde quand une session
+// tourne) : pendant un appui, la zone appuyée garde son contenu et le rendu attend la fin du clic.
+const lastHtml = new WeakMap();
+const heldHtml = new Map();
+let pressed = null;
+let pressSeq = 0;
+
+function setHtml(el, html) {
+  if (pressed && el.contains(pressed)) {
+    heldHtml.set(el, html);
+    return;
+  }
+  if (lastHtml.get(el) === html) return;
+  const top = el.scrollTop;
+  el.innerHTML = html;
+  el.scrollTop = top;
+  lastHtml.set(el, html);
+}
+
+function releasePress() {
+  if (!pressed) return;
+  const seq = pressSeq;
+  // Après le click (et le dblclick) qui suivent le relâchement.
+  setTimeout(() => {
+    if (seq !== pressSeq) return; // nouvel appui entre-temps : il relâchera à son tour
+    pressed = null;
+    for (const [el, html] of heldHtml) setHtml(el, html);
+    heldHtml.clear();
+  });
+}
+
+window.addEventListener(
+  'pointerdown',
+  (e) => {
+    if (e.button !== 0) return;
+    pressed = e.target;
+    pressSeq += 1;
+  },
+  true,
+);
+window.addEventListener('pointerup', releasePress, true);
+window.addEventListener('pointercancel', releasePress, true);
+window.addEventListener('blur', releasePress);
+
 function render() {
   renderSummary();
   renderUpdate();
@@ -304,10 +349,13 @@ function counts() {
 function renderSummary() {
   const c = counts();
   const labels = { waiting: 'en attente de toi', done: 'terminée(s), à lire', busy: 'en cours' };
-  summaryEl.innerHTML = ['waiting', 'done', 'busy']
-    .filter((k) => c[k])
-    .map((k) => `<span class="chip" data-state="${k}" title="${c[k]} ${labels[k]}"><i class="dot s-${k}"></i>${c[k]}</span>`)
-    .join('');
+  setHtml(
+    summaryEl,
+    ['waiting', 'done', 'busy']
+      .filter((k) => c[k])
+      .map((k) => `<span class="chip" data-state="${k}" title="${c[k]} ${labels[k]}"><i class="dot s-${k}"></i>${c[k]}</span>`)
+      .join(''),
+  );
   const todo = c.waiting + c.done;
   document.title = todo ? `Claude Deck — ${todo} à traiter` : 'Claude Deck';
 }
@@ -320,16 +368,19 @@ function renderUpdate() {
   }
   updateEl.hidden = false;
   const notes = u.notes ? `<div class="update-notes">${esc(u.notes)}</div>` : '';
-  updateEl.innerHTML = `<strong>Claude Deck ${esc(u.latest)} est prête à installer</strong>${notes}
+  setHtml(
+    updateEl,
+    `<strong>Claude Deck ${esc(u.latest)} est prête à installer</strong>${notes}
     <div class="actions">
       <button class="btn primary" data-act="installUpdate">Redémarrer</button>
       <button class="btn ghost" data-act="releaseNotes">Nouveautés</button>
       <button class="btn ghost" data-act="dismissUpdate">Plus tard</button>
-    </div>`;
+    </div>`,
+  );
 }
 
 function renderUsage() {
-  usageEl.innerHTML = usageFooterHtml(S.usage, S.bridge);
+  setHtml(usageEl, usageFooterHtml(S.usage, S.bridge));
   usageEl.classList.toggle('selected', S.selected === 'view:stats');
 }
 
@@ -340,12 +391,15 @@ function renderBridge() {
     return;
   }
   bridgeEl.hidden = false;
-  bridgeEl.innerHTML = `<strong>Suivre ton forfait en direct</strong>
+  setHtml(
+    bridgeEl,
+    `<strong>Suivre ton forfait en direct</strong>
     <div class="update-notes">Session et semaine comme /usage, mis à jour après chaque réponse de Claude.</div>
     <div class="actions">
       <button class="btn primary" data-act="enableBridge">Activer</button>
       <button class="btn ghost" data-act="dismissBridge">Plus tard</button>
-    </div>`;
+    </div>`,
+  );
 }
 
 function renderRestore() {
@@ -357,11 +411,14 @@ function renderRestore() {
   const n = ids.length;
   const s = n > 1 ? 's' : '';
   restoreEl.hidden = false;
-  restoreEl.innerHTML = `<strong>${n} session${s} ouverte${s} dans l’appli à la dernière fermeture</strong>
+  setHtml(
+    restoreEl,
+    `<strong>${n} session${s} ouverte${s} dans l’appli à la dernière fermeture</strong>
     <div class="actions">
       <button class="btn primary" data-act="resumeAll">Tout reprendre</button>
       <button class="btn ghost" data-act="dismissRestore">Ignorer</button>
-    </div>`;
+    </div>`,
+  );
 }
 
 function rowActions(it) {
@@ -404,9 +461,7 @@ function rowHtml(it, idx, tokens = []) {
 }
 
 function renderList() {
-  const scroll = listEl.scrollTop;
-  listEl.innerHTML = S.results ? resultsHtml() : groupsHtml();
-  listEl.scrollTop = scroll;
+  setHtml(listEl, S.results ? resultsHtml() : groupsHtml());
 }
 
 function resultsHtml() {
@@ -606,9 +661,12 @@ function renderPane(force = false) {
     cardEl.hidden = false;
     S.visiblePty = null;
     if (force || S.headSig !== 'view:settings') {
-      headEl.innerHTML = `<span class="pill"><i class="dot s-idle"></i>Réglages</span>
+      setHtml(
+        headEl,
+        `<span class="pill"><i class="dot s-idle"></i>Réglages</span>
         <div class="title"><h1>Réglages</h1><span class="meta">enregistrés aussitôt</span></div>
-        <div class="actions"></div>`;
+        <div class="actions"></div>`,
+      );
     }
     S.headSig = 'view:settings';
     if (!S.settings) loadSettings();
@@ -627,9 +685,12 @@ function renderPane(force = false) {
     cardEl.hidden = false;
     S.visiblePty = null;
     if (force || S.headSig !== 'view:stats') {
-      headEl.innerHTML = `<span class="pill"><i class="dot s-idle"></i>Statistiques</span>
+      setHtml(
+        headEl,
+        `<span class="pill"><i class="dot s-idle"></i>Statistiques</span>
         <div class="title"><h1>Usage et activité</h1><span class="meta">30 derniers jours</span></div>
-        <div class="actions">${btn('refreshStats', '', 'Actualiser')}</div>`;
+        <div class="actions">${btn('refreshStats', '', 'Actualiser')}</div>`,
+      );
     }
     S.headSig = 'view:stats';
     if (!S.stats || Date.now() - S.statsAt > 60000) loadStats();
@@ -644,7 +705,7 @@ function renderPane(force = false) {
   }
   // On ne réécrit que ce qui change (préserve la sélection de texte et le défilement).
   const headSig = JSON.stringify([it.key, it.state, it.title, it.cwd, it.archived, it.waitingFor, it.stale, it.hostApp, it.lastSessionId, it.context, it.branch, it.turnActions, it.state === 'busy' ? ago(it.since) : 0]);
-  if (force || headSig !== S.headSig) headEl.innerHTML = headHtml(it);
+  if (force || headSig !== S.headSig) setHtml(headEl, headHtml(it));
   S.headSig = headSig;
 
   if (it.ptyId != null) {
