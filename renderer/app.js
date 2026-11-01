@@ -1142,7 +1142,13 @@ function createTerm(ptyId, replay) {
   term.loadAddon(new Unicode11Addon.Unicode11Addon());
   term.unicode.activeVersion = '11';
   term.loadAddon(new WebLinksAddon.WebLinksAddon(openLink));
-  term.registerLinkProvider(issueLinkProvider(term, () => S.config, openLink));
+  term.registerLinkProvider(
+    issueLinkProvider(term, () => S.config, async (event, link) => {
+      if (!event || !event.metaKey) return;
+      if (link.url) return openLink(event, link.url);
+      if (!(await deck.openMergeRequest(ptyId, link.mr))) toast('Merge request introuvable : ni dépôt git dans ce dossier, ni adresse dans Réglages › Terminal › Liens');
+    }),
+  );
   // OSC 52 : un programme du terminal peut écrire dans le presse-papiers, jamais le lire.
   term.loadAddon(
     new ClipboardAddon.ClipboardAddon(undefined, {
@@ -1512,7 +1518,10 @@ deck.on('deck:command', (name) => {
   } else if (name.startsWith('font:')) changeFont(name.slice(5));
 });
 
-deck.on('pty:created', (p) => createTerm(p.id, ''));
+// Bloc sans valeur de retour : contextBridge la recopierait, et un terminal n'est pas clonable.
+deck.on('pty:created', (p) => {
+  createTerm(p.id, '');
+});
 deck.on('pty:data', (id, data) => (S.terms.get(id) || createTerm(id, '')).term.write(data));
 deck.on('pty:exit', (id) => {
   removeTerm(id);

@@ -1,7 +1,8 @@
 'use strict';
 // Tickets Jira (PROJ-1234) et merge requests GitLab (!8045, !MR8045, MR!8045) cliquables dans le terminal.
 
-// Liens trouvés dans un texte : [{ start, end (exclu), url }], selon les modèles d'URL des réglages.
+// Liens trouvés dans un texte : [{ start, end (exclu), url }] pour Jira (modèle des réglages),
+// [{ start, end, mr }] pour les merge requests (URL déduite du dépôt de la session au clic).
 function findIssueLinks(text, config) {
   const links = [];
   const keys = String(config.jiraKeys || '')
@@ -14,10 +15,8 @@ function findIssueLinks(text, config) {
       links.push({ start: m.index, end: m.index + m[0].length, url: config.jiraUrl.replace('{key}', m[0]) });
     }
   }
-  if (config.mergeRequestUrl) {
-    for (const m of text.matchAll(/(?<![\w!])(?:!MR|MR!|!)(\d+)(?!\w)/g)) {
-      links.push({ start: m.index, end: m.index + m[0].length, url: config.mergeRequestUrl.replace('{n}', m[1]) });
-    }
+  for (const m of text.matchAll(/(?<![\w!])(?:!MR|MR!|!)(\d{1,7})(?!\w)/g)) {
+    links.push({ start: m.index, end: m.index + m[0].length, mr: m[1] });
   }
   return links;
 }
@@ -41,7 +40,7 @@ function issueLinkProvider(term, getConfig, activate) {
       const links = findIssueLinks(text, getConfig()).map((l) => ({
         range: { start: { x: cols[l.start], y }, end: { x: cols[l.end - 1], y } },
         text: text.slice(l.start, l.end),
-        activate: (event) => activate(event, l.url),
+        activate: (event) => activate(event, l),
       }));
       callback(links.length ? links : undefined);
     },

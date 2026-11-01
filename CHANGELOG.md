@@ -2,7 +2,8 @@
 
 ## 0.4.0
 
-- Tickets Jira (`PROJ-1234`) et merge requests GitLab (`!8045`, `!MR8045`, `MR!8045`) cliquables dans le terminal, d'un ⌘-clic comme les liens. Adresses à régler dans Réglages › Terminal › Liens : modèle d'URL avec `{key}` ou `{n}` et préfixes des projets Jira. Rien n'est souligné tant que ces champs sont vides.
+- Tickets Jira (`PROJ-1234`) et merge requests (`!8045`, `!MR8045`, `MR!8045`) cliquables dans le terminal, d'un ⌘-clic comme les liens. Une merge request s'ouvre sur le dépôt git du dossier de la session (GitLab, ou la pull request sur GitHub), sans rien régler. Pour Jira : modèle d'URL avec `{key}` et préfixes des projets dans Réglages › Terminal › Liens.
+- Plus d'erreur « An object could not be cloned » à chaque nouvelle session.
 - Electron 44.10.1 (correctifs de sécurité).
 
 ## 0.3.2

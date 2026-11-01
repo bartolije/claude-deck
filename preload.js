@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('deck', {
   setCollapsed: (group, value) => ipcRenderer.send('deck:collapsed', group, value),
   setFontSize: (size) => ipcRenderer.send('deck:fontSize', size),
   openExternal: (url) => ipcRenderer.send('deck:openExternal', url),
+  openMergeRequest: (ptyId, n) => ipcRenderer.invoke('deck:openMergeRequest', ptyId, n),
   openPath: (p) => ipcRenderer.send('deck:openPath', p),
   copy: (text) => ipcRenderer.send('deck:copy', text),
   checkUpdate: () => ipcRenderer.invoke('deck:checkUpdate'),

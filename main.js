@@ -9,6 +9,7 @@ const { PtyManager, shellQuote } = require('./lib/ptys');
 const { Store, DEFAULT_CONFIG } = require('./lib/store');
 const { Updater, RELEASES_URL } = require('./lib/updater');
 const { Usage } = require('./lib/usage');
+const gitLinks = require('./lib/git-links');
 
 app.setName('Claude Deck');
 
@@ -1198,6 +1199,18 @@ function registerIpc() {
     lastOpen: store.state.lastOpen || [],
     ptys: ptys.list().map((p) => ({ ...ptys.describe(p), replay: ptys.replay(p.id) })),
   }));
+  // !8045 : MR du dépôt git du dossier de la session, sinon modèle d'URL des réglages.
+  ipcMain.handle('deck:openMergeRequest', async (_e, ptyId, n) => {
+    if (!/^\d{1,7}$/.test(String(n))) return false;
+    const it = items.find((i) => i.ptyId === ptyId);
+    const p = ptys.get(ptyId);
+    const cwd = (it && it.cwd) || (p && (p.lastCwd || (await gitLinks.cwdOfPid(p.pid))));
+    let url = cwd && fs.existsSync(cwd) ? gitLinks.mergeRequestUrl(await gitLinks.remoteOf(cwd), n) : null;
+    if (!url && store.config.mergeRequestUrl) url = store.config.mergeRequestUrl.replace('{n}', n);
+    if (!url) return false;
+    shell.openExternal(url);
+    return true;
+  });
   ipcMain.handle('deck:new', () => startNew());
   ipcMain.handle('deck:newInFolder', () => startNewInFolder());
   ipcMain.handle('deck:resume', (_e, sessionId, opts) => resume(sessionId, { fork: !!(opts && opts.fork) }));
