@@ -18,6 +18,10 @@ function findIssueLinks(text, config) {
   for (const m of text.matchAll(/(?<![\w!])(?:!MR|MR!|!)(\d{1,7})(?!\w)/g)) {
     links.push({ start: m.index, end: m.index + m[0].length, mr: m[1] });
   }
+  // Référence complète (groupe/projet!8045, « See merge request … ») : le projet est écrit, pas besoin du dépôt.
+  for (const m of text.matchAll(/(?<![\w./:-])([\w.-]+(?:\/[\w.-]+)+)!(\d{1,7})(?!\w)/g)) {
+    links.push({ start: m.index, end: m.index + m[0].length, mr: m[2], project: m[1] });
+  }
   return links;
 }
 

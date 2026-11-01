@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+
+- Merge requests citées avec leur projet (`groupe/projet!8045`, « See merge request … ») cliquables depuis n'importe quel dossier, même hors d'un dépôt git : l'adresse GitLab vient du dépôt de la session ou du modèle de secours des réglages.
+- Liste des projets Jira plus longue acceptée (une trentaine de préfixes était refusée).
+
 ## 0.4.0
 
 - Tickets Jira (`PROJ-1234`) et merge requests (`!8045`, `!MR8045`, `MR!8045`) cliquables dans le terminal, d'un ⌘-clic comme les liens. Une merge request s'ouvre sur le dépôt git du dossier de la session (GitLab, ou la pull request sur GitHub), sans rien régler. Pour Jira : modèle d'URL avec `{key}` et préfixes des projets dans Réglages › Terminal › Liens.

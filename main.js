@@ -863,7 +863,7 @@ function sanitizeSettings(patch) {
     else if (rule === 'font' && typeof v === 'string' && v.trim() && v.length < 200 && !/[;{}<>]/.test(v)) out[k] = v.trim();
     else if (rule === 'accelerator' && isAccelerator(v)) out[k] = v;
     else if (rule === 'linkTemplate' && typeof v === 'string' && (v === '' || (/^https:\/\/\S+$/.test(v) && v.length < 500))) out[k] = v;
-    else if (rule === 'jiraKeys' && typeof v === 'string' && v.length < 200 && /^[A-Za-z0-9,\s]*$/.test(v)) out[k] = v;
+    else if (rule === 'jiraKeys' && typeof v === 'string' && v.length < 2000 && /^[A-Za-z0-9,\s]*$/.test(v)) out[k] = v;
     else if (Array.isArray(rule) && typeof rule[0] === 'string' && rule.includes(v)) out[k] = v;
     else if (Array.isArray(rule) && typeof v === 'number' && Number.isFinite(v)) out[k] = Math.min(rule[1], Math.max(rule[0], v));
     else if (rule === 'shortcuts' && v && typeof v === 'object') {
@@ -1200,13 +1200,18 @@ function registerIpc() {
     ptys: ptys.list().map((p) => ({ ...ptys.describe(p), replay: ptys.replay(p.id) })),
   }));
   // !8045 : MR du dépôt git du dossier de la session, sinon modèle d'URL des réglages.
-  ipcMain.handle('deck:openMergeRequest', async (_e, ptyId, n) => {
+  // groupe/projet!8045 : ce projet, sur l'hôte GitLab du dépôt de la session ou du modèle des réglages.
+  ipcMain.handle('deck:openMergeRequest', async (_e, ptyId, n, project) => {
     if (!/^\d{1,7}$/.test(String(n))) return false;
+    if (project != null && !/^[\w.-]+(?:\/[\w.-]+)+$/.test(String(project))) return false;
     const it = items.find((i) => i.ptyId === ptyId);
     const p = ptys.get(ptyId);
     const cwd = (it && it.cwd) || (p && (p.lastCwd || (await gitLinks.cwdOfPid(p.pid))));
-    let url = cwd && fs.existsSync(cwd) ? gitLinks.mergeRequestUrl(await gitLinks.remoteOf(cwd), n) : null;
-    if (!url && store.config.mergeRequestUrl) url = store.config.mergeRequestUrl.replace('{n}', n);
+    const remote = cwd && fs.existsSync(cwd) ? await gitLinks.remoteOf(cwd) : '';
+    let url = project
+      ? gitLinks.projectMergeRequestUrl(project, n, remote, store.config.mergeRequestUrl)
+      : gitLinks.mergeRequestUrl(remote, n);
+    if (!url && !project && store.config.mergeRequestUrl) url = store.config.mergeRequestUrl.replace('{n}', n);
     if (!url) return false;
     shell.openExternal(url);
     return true;

@@ -1146,7 +1146,7 @@ function createTerm(ptyId, replay) {
     issueLinkProvider(term, () => S.config, async (event, link) => {
       if (!event || !event.metaKey) return;
       if (link.url) return openLink(event, link.url);
-      if (!(await deck.openMergeRequest(ptyId, link.mr))) toast('Merge request introuvable : ni dépôt git dans ce dossier, ni adresse dans Réglages › Terminal › Liens');
+      if (!(await deck.openMergeRequest(ptyId, link.mr, link.project))) toast('Merge request introuvable : ni dépôt git dans ce dossier, ni adresse dans Réglages › Terminal › Liens');
     }),
   );
   // OSC 52 : un programme du terminal peut écrire dans le presse-papiers, jamais le lire.

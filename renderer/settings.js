@@ -165,7 +165,7 @@ function settingsHtml(payload, tab, perms, recording) {
         <p class="s-hint">Tickets et merge requests cités par Claude, ouverts d’un ⌘-clic. Laisser vide pour désactiver.</p>
         ${textRow('jiraUrl', 'Ticket Jira', '{key} est remplacé par le ticket (PROJ-1234).', c.jiraUrl, 'https://xxx.atlassian.net/browse/{key}')}
         ${textRow('jiraKeys', 'Projets Jira', 'Préfixes reconnus, séparés par des virgules.', c.jiraKeys, 'PROJ, OPS')}
-        ${textRow('mergeRequestUrl', 'Merge request GitLab (secours)', 'Les !8045 ouvrent la MR du dépôt git de la session ; ce modèle sert hors dépôt. {n} = numéro.', c.mergeRequestUrl, 'https://gitlab.xxx/groupe/projet/-/merge_requests/{n}')}
+        ${textRow('mergeRequestUrl', 'Merge request GitLab (secours)', 'Les !8045 ouvrent la MR du dépôt git de la session ; ce modèle sert hors dépôt ({n} = numéro) et donne l’adresse GitLab des références groupe/projet!8045.', c.mergeRequestUrl, 'https://gitlab.xxx/groupe/projet/-/merge_requests/{n}')}
       </section>`;
   } else if (tab === 'shortcuts') {
     const counts = {};
