@@ -844,6 +844,9 @@ const SETTINGS_SCHEMA = {
   lineHeight: [0.8, 2],
   scrollSpeed: [1, 5],
   claudeDisplay: ['auto', 'classic', 'fullscreen'],
+  jiraUrl: 'linkTemplate',
+  jiraKeys: 'jiraKeys',
+  mergeRequestUrl: 'linkTemplate',
   globalShortcut: 'accelerator',
   shortcuts: 'shortcuts',
 };
@@ -858,6 +861,8 @@ function sanitizeSettings(patch) {
     else if (rule === 'path' && typeof v === 'string' && path.isAbsolute(v) && fs.existsSync(v)) out[k] = v;
     else if (rule === 'font' && typeof v === 'string' && v.trim() && v.length < 200 && !/[;{}<>]/.test(v)) out[k] = v.trim();
     else if (rule === 'accelerator' && isAccelerator(v)) out[k] = v;
+    else if (rule === 'linkTemplate' && typeof v === 'string' && (v === '' || (/^https:\/\/\S+$/.test(v) && v.length < 500))) out[k] = v;
+    else if (rule === 'jiraKeys' && typeof v === 'string' && v.length < 200 && /^[A-Za-z0-9,\s]*$/.test(v)) out[k] = v;
     else if (Array.isArray(rule) && typeof rule[0] === 'string' && rule.includes(v)) out[k] = v;
     else if (Array.isArray(rule) && typeof v === 'number' && Number.isFinite(v)) out[k] = Math.min(rule[1], Math.max(rule[0], v));
     else if (rule === 'shortcuts' && v && typeof v === 'object') {

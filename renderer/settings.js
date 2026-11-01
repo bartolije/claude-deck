@@ -160,6 +160,12 @@ function settingsHtml(payload, tab, perms, recording) {
           [2, 'Rapide (×2)'],
           [3, 'Très rapide (×3)'],
         ])}
+      </section>
+      <section class="s-group"><h3>Liens</h3>
+        <p class="s-hint">Tickets et merge requests cités par Claude, ouverts d’un ⌘-clic. Laisser vide pour désactiver.</p>
+        ${textRow('jiraUrl', 'Ticket Jira', '{key} est remplacé par le ticket (PROJ-1234).', c.jiraUrl, 'https://xxx.atlassian.net/browse/{key}')}
+        ${textRow('jiraKeys', 'Projets Jira', 'Préfixes reconnus, séparés par des virgules.', c.jiraKeys, 'PROJ, OPS')}
+        ${textRow('mergeRequestUrl', 'Merge request GitLab', '{n} est remplacé par le numéro (!8045, !MR8045).', c.mergeRequestUrl, 'https://gitlab.xxx/groupe/projet/-/merge_requests/{n}')}
       </section>`;
   } else if (tab === 'shortcuts') {
     const counts = {};

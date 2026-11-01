@@ -113,7 +113,7 @@ Claude Deck ne lit jamais tes identifiants Claude. Les pourcentages viennent de 
 | `⇧⌘]` / `⇧⌘[` | Session suivante / précédente |
 | `⌘W` | Fermer la session (confirmation si Claude tourne) |
 | `⇧↩` ou `⌥↩` | Retour à la ligne dans le prompt |
-| `⌘-clic` | Ouvrir un lien |
+| `⌘-clic` | Ouvrir un lien, un ticket Jira (`PROJ-1234`) ou une merge request GitLab (`!8045`, `!MR8045`) : adresses à régler dans Réglages › Terminal › Liens |
 
 ## Comment ça marche
 

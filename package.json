@@ -1,6 +1,6 @@
 {
   "name": "claude-deck",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "private": true,
   "description": "Toutes tes sessions Claude Code au même endroit : statut en couleur, terminaux intégrés, recherche et reprise en un clic (macOS)",
   "author": "bartolije",
@@ -13,6 +13,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "test": "node scripts/test-issue-links.js",
     "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper",
     "icons": "electron scripts/make-icons.js && bash scripts/make-icns.sh",
     "package": "bash scripts/package.sh",
@@ -34,6 +35,7 @@
     "node-pty": "^1.1.0"
   },
   "allowScripts": {
-    "electron@44.7.2": true
+    "electron@44.10.1": true,
+    "node-pty@1.1.0": true
   }
 }

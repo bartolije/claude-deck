@@ -1,5 +1,5 @@
 'use strict';
-/* global deck, Terminal, FitAddon, Unicode11Addon, WebLinksAddon, ClipboardAddon */
+/* global deck, Terminal, FitAddon, Unicode11Addon, WebLinksAddon, ClipboardAddon, issueLinkProvider */
 
 const $ = (sel) => document.querySelector(sel);
 const listEl = $('#list');
@@ -1142,6 +1142,7 @@ function createTerm(ptyId, replay) {
   term.loadAddon(new Unicode11Addon.Unicode11Addon());
   term.unicode.activeVersion = '11';
   term.loadAddon(new WebLinksAddon.WebLinksAddon(openLink));
+  term.registerLinkProvider(issueLinkProvider(term, () => S.config, openLink));
   // OSC 52 : un programme du terminal peut écrire dans le presse-papiers, jamais le lire.
   term.loadAddon(
     new ClipboardAddon.ClipboardAddon(undefined, {

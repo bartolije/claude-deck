@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+- Tickets Jira (`PROJ-1234`) et merge requests GitLab (`!8045`, `!MR8045`, `MR!8045`) cliquables dans le terminal, d'un ⌘-clic comme les liens. Adresses à régler dans Réglages › Terminal › Liens : modèle d'URL avec `{key}` ou `{n}` et préfixes des projets Jira. Rien n'est souligné tant que ces champs sont vides.
+- Electron 44.10.1 (correctifs de sécurité).
+
 ## 0.3.2
 
 - Jauge de contexte juste avec les modèles à 1 M de jetons (Opus 5.5, Fable 5.1…). Faute d'information récente de la barre d'état, la jauge supposait une fenêtre de 200 000 jetons : la plupart des sessions affichaient 100 % alors qu'elles en étaient à 15-50 %. La taille de fenêtre transmise par Claude Code est maintenant retenue pour chaque session et chaque modèle.
